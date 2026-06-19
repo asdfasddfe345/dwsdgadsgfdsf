@@ -467,15 +467,16 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
 
       {/* ── Map (always mounted, hidden on details step) ── */}
       <div className={`relative min-h-0 ${step === 'map' ? 'flex-1' : 'h-0 overflow-hidden'}`}>
-        {/* Map container */}
-        <div ref={mapContainerRef} className="absolute inset-0" style={{ background: '#0f1117' }}>
-          {!mapsLoaded && (
-            <div className="absolute inset-0 flex items-center justify-center gap-2 text-brand-text-dim text-[13px]">
-              <Loader2 size={16} className="animate-spin text-brand-gold" />
-              <span>Loading map...</span>
-            </div>
-          )}
-        </div>
+        {/* Map container — Google Maps owns this div's children; keep it empty */}
+        <div ref={mapContainerRef} className="absolute inset-0" style={{ background: '#0f1117' }} />
+
+        {/* Loading overlay — sibling so React never fights Google Maps for its children */}
+        {!mapsLoaded && (
+          <div className="absolute inset-0 flex items-center justify-center gap-2 text-brand-text-dim text-[13px]" style={{ zIndex: 1 }}>
+            <Loader2 size={16} className="animate-spin text-brand-gold" />
+            <span>Loading map...</span>
+          </div>
+        )}
 
         {/* Fixed centre pin */}
         <div className="absolute pointer-events-none flex flex-col items-center" style={{ zIndex: 9999, left: '50%', top: '50%', transform: 'translate(-50%, -100%)' }}>
