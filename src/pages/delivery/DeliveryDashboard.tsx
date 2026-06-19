@@ -93,6 +93,7 @@ function RouteMap({ order }: { order: Order }) {
           zoom: 12,
           mapTypeId: 'roadmap',
           styles: DARK_MAP_STYLE,
+          backgroundColor: '#0f1117',
           disableDefaultUI: true,
           gestureHandling: 'cooperative',
           clickableIcons: false,

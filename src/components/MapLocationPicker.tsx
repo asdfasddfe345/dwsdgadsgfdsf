@@ -162,10 +162,11 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
           if (cancelled || !mapContainerRef.current) return;
 
         const map = new window.google.maps.Map(mapContainerRef.current, {
-          center       : { lat: initialLat ?? DEFAULT_LAT, lng: initialLng ?? DEFAULT_LNG },
-          zoom         : DEFAULT_ZOOM,
-          mapTypeId    : tileMode === 'satellite' ? 'satellite' : 'roadmap',
-          styles       : tileMode === 'street' ? DARK_MAP_STYLE : undefined,
+          center          : { lat: initialLat ?? DEFAULT_LAT, lng: initialLng ?? DEFAULT_LNG },
+          zoom            : DEFAULT_ZOOM,
+          mapTypeId       : tileMode === 'satellite' ? 'satellite' : 'roadmap',
+          styles          : tileMode === 'street' ? DARK_MAP_STYLE : undefined,
+          backgroundColor : '#0f1117',
           disableDefaultUI: true,
           gestureHandling : 'greedy',
           clickableIcons  : false,
