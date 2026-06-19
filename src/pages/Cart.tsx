@@ -149,7 +149,7 @@ type RefreshmentSuggestion = {
   reason: string | null;
 };
 type CheckoutOrderType = OrderType;
-type CheckoutStep = 'customer' | 'payment';
+type CheckoutStep = 'service' | 'coupon' | 'payment';
 
 function getPromoRewardSummary(items: OfferRewardItem[]) {
   return items.map((item) => `${item.quantity}x ${item.item_name}`).join(', ');
@@ -270,7 +270,7 @@ export default function CartPage() {
     if (saved.deliveryPincode) setDeliveryPincode(saved.deliveryPincode);
     if (saved.deliveryLat !== null) setDeliveryLat(saved.deliveryLat);
     if (saved.deliveryLng !== null) setDeliveryLng(saved.deliveryLng);
-    setCheckoutStep('customer');
+    setCheckoutStep('service');
   }, [user]);
 
   useEffect(() => {
@@ -992,7 +992,7 @@ export default function CartPage() {
       return;
     }
 
-    setCheckoutStep('customer');
+    setCheckoutStep('service');
   }
 
   function closeCheckoutFlow() {
@@ -1020,17 +1020,44 @@ export default function CartPage() {
     }
   }
 
-  function handleCustomerContinue() {
-    if (submitting || !validateCheckoutAvailability() || !validateDeliveryDetails() || !validateCustomerDetails()) {
-      return;
+  function handleServiceContinue() {
+    if (submitting || !validateCheckoutAvailability()) return;
+
+    if (DELIVERY_CHECKOUT_ENABLED && activeOrderType === 'delivery') {
+      if (!user) {
+        showToast('Please sign in to use delivery', 'error');
+        saveCheckoutResume({ name, email, phone, orderType: 'delivery', deliveryAddress, deliveryPincode, deliveryLat, deliveryLng });
+        setCheckoutStep(null);
+        navigate('/auth', { state: { from: '/cart' } });
+        return;
+      }
+      if (!deliveryAddress.trim()) {
+        showToast('Please select or enter your delivery address', 'error');
+        return;
+      }
+      if (deliveryPincode.trim().length !== 6) {
+        showToast('Please enter a valid 6-digit delivery pincode', 'error');
+        return;
+      }
+      if (deliveryLookupLoading) {
+        showToast('Checking delivery availability for your pincode', 'error');
+        return;
+      }
+      if (!deliveryZone) {
+        showToast(deliveryLookupError || 'Delivery is not available for this pincode yet', 'error');
+        return;
+      }
+      if (subtotal < deliveryMinimumOrder) {
+        showToast(`Minimum order for ${deliveryZone.area_name} is ₹${deliveryMinimumOrder.toFixed(0)}`, 'error');
+        return;
+      }
     }
 
-    if (activeOrderType === 'delivery') {
-      setCheckoutStep(null);
-      void submitCheckout(activeOrderType, pickupOption, 'card');
-      return;
-    }
+    setCheckoutStep('coupon');
+  }
 
+  function handleCouponContinue() {
+    if (submitting) return;
     setCheckoutStep('payment');
   }
 
@@ -1065,11 +1092,11 @@ export default function CartPage() {
     try {
       const checkoutAddress = checkoutOrderType === 'delivery' ? deliveryAddress.trim() : '';
       const checkoutPincode = checkoutOrderType === 'delivery' ? deliveryPincode.trim() : '';
+      const checkoutDeliveryLat = checkoutOrderType === 'delivery' ? deliveryLat : null;
+      const checkoutDeliveryLng = checkoutOrderType === 'delivery' ? deliveryLng : null;
       const checkoutDeliveryFee = checkoutOrderType === 'delivery'
         ? (subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : getDistanceBasedDeliveryFee(checkoutDeliveryLat, checkoutDeliveryLng))
         : 0;
-      const checkoutDeliveryLat = checkoutOrderType === 'delivery' ? deliveryLat : null;
-      const checkoutDeliveryLng = checkoutOrderType === 'delivery' ? deliveryLng : null;
       const checkoutTotal = getTotalForCheckoutMode(checkoutOrderType, checkoutPickupOption);
       const checkoutIsFreeOrder = checkoutTotal <= 0;
       const customerEmail = getCustomerEmail();
@@ -1591,238 +1618,6 @@ export default function CartPage() {
           </Link>
         </div>
 
-        <div className="bg-brand-surface rounded-xl p-4 border border-brand-border mb-4">
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Tag size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-text-dim" />
-              <input
-                type="text"
-                placeholder="Coupon code"
-                value={couponCode}
-                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                className="input-field pl-9 text-[13px]"
-              />
-            </div>
-            <button onClick={applyCoupon} className="btn-outline px-4 py-2 text-[13px] font-semibold rounded-lg">Apply</button>
-          </div>
-          {couponError && <p className="text-red-400 text-[12px] mt-2">{couponError}</p>}
-          {appliedOffer && (
-            <div className="mt-2.5 bg-emerald-500/10 text-emerald-400 text-[12px] px-3 py-2 rounded-lg flex items-center justify-between">
-              <span className="font-semibold">
-                {appliedOffer.title} applied! {couponRewardItems.length > 0 ? `${getPromoRewardSummary(couponRewardItems)} added free.` : getOfferRuleSummary(appliedOffer)}
-              </span>
-              <button onClick={() => { setAppliedOffer(null); setCouponCode(''); }} className="font-semibold hover:underline">Remove</button>
-            </div>
-          )}
-          {reviewRewardCoupons.length > 0 && (
-            <div className="mt-2.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-3 text-[12px]">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 text-emerald-300">
-                  <Gift size={14} />
-                  <span className="font-semibold">Review rewards</span>
-                </div>
-                {selectedReviewRewardCoupon && (
-                  <button
-                    onClick={() => setSelectedReviewRewardCouponId(null)}
-                    className="font-semibold text-brand-text-muted hover:text-white"
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-              <p className="mt-1 text-emerald-200">
-                Use one 10% item-review reward on this order.
-              </p>
-              <div className="mt-3 space-y-2">
-                {reviewRewardCoupons.map((coupon) => {
-                  const isSelected = selectedReviewRewardCouponId === coupon.id;
-                  const rewardDiscountAmount = calculateReviewRewardDiscount(
-                    subtotal,
-                    Number(coupon.discount_percentage || 0),
-                  );
-
-                  return (
-                    <button
-                      key={coupon.id}
-                      onClick={() => setSelectedReviewRewardCouponId(coupon.id)}
-                      className={`w-full rounded-lg border px-3 py-2 text-left transition-colors ${
-                        isSelected
-                          ? 'border-emerald-400/40 bg-emerald-500/15'
-                          : 'border-brand-border bg-brand-surface/40 hover:border-emerald-500/30 hover:bg-brand-surface/60'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className={`font-semibold ${isSelected ? 'text-emerald-300' : 'text-white'}`}>
-                          {coupon.code}
-                        </span>
-                        <span className={`font-bold ${isSelected ? 'text-emerald-200' : 'text-emerald-300'}`}>
-                          Save {'\u20B9'}{rewardDiscountAmount.toFixed(0)}
-                        </span>
-                      </div>
-                      <p className={`mt-1 ${isSelected ? 'text-emerald-200' : 'text-brand-text-muted'}`}>
-                        10% off from your item review reward
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          {featuredAutomaticOffer && (
-            <div className="mt-2.5 rounded-lg border border-brand-gold/20 bg-brand-gold/10 px-3 py-3 text-[12px]">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-semibold text-brand-gold">
-                  {multipleAutomaticOffersAvailable ? 'Choose 1 automatic offer for this order' : `${featuredAutomaticOffer.title} available`}
-                </span>
-                {multipleAutomaticOffersAvailable && automaticOfferApplied && selectedAutomaticOffer && (
-                  <button
-                    onClick={() => setSelectedAutomaticOfferId(null)}
-                    className="font-semibold text-brand-text-muted hover:text-white"
-                  >
-                    Change
-                  </button>
-                )}
-              </div>
-
-              {!multipleAutomaticOffersAvailable && (
-                <p className={`mt-1 ${automaticOfferApplied ? 'text-emerald-400' : 'text-brand-gold'}`}>
-                  {automaticOfferApplied
-                    ? automaticRewardItems.length > 0
-                      ? `${getPromoRewardSummary(automaticRewardItems)} added free.`
-                      : `You saved ₹${automaticDiscount.toFixed(0)}.`
-                    : getOfferRuleSummary(featuredAutomaticOffer)}
-                </p>
-              )}
-
-              {multipleAutomaticOffersAvailable && (
-                <div className="mt-3 space-y-2">
-                  {applicableAutomaticOffers.map((offerResult) => {
-                    const isSelected = selectedAutomaticOfferId === offerResult.offer.id;
-                    const offerValueText = offerResult.freeItems.length > 0
-                      ? `${getPromoRewardSummary(offerResult.freeItems)} free`
-                      : `Save ₹${offerResult.discountAmount.toFixed(0)}`;
-
-                    return (
-                      <button
-                        key={offerResult.offer.id}
-                        onClick={() => setSelectedAutomaticOfferId(offerResult.offer.id)}
-                        className={`w-full rounded-lg border px-3 py-2 text-left transition-colors ${
-                          isSelected
-                            ? 'border-emerald-500/30 bg-emerald-500/10'
-                            : 'border-brand-border bg-brand-surface/40 hover:border-brand-gold/30 hover:bg-brand-surface/60'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className={`font-semibold ${isSelected ? 'text-emerald-400' : 'text-white'}`}>
-                            {offerResult.offer.title}
-                          </span>
-                          <span className={`text-[11px] font-bold ${isSelected ? 'text-emerald-300' : 'text-brand-gold'}`}>
-                            {offerValueText}
-                          </span>
-                        </div>
-                        <p className={`mt-1 ${isSelected ? 'text-emerald-300' : 'text-brand-text-muted'}`}>
-                          {getOfferRuleSummary(offerResult.offer)}
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Order type selector */}
-        <div className="bg-brand-surface rounded-xl border border-brand-border mb-4 overflow-hidden">
-          <div className="px-4 pt-4 pb-3">
-            <p className="text-[12px] font-black uppercase tracking-[0.18em] text-brand-text-dim mb-3">How would you like it?</p>
-            <div className="grid grid-cols-3 gap-2">
-              {([
-                { type: 'pickup' as CheckoutOrderType, pickup: 'dine_in' as PickupOption, icon: Store, label: 'Dine In' },
-                { type: 'pickup' as CheckoutOrderType, pickup: 'takeaway' as PickupOption, icon: ShoppingBag, label: 'Takeaway' },
-                { type: 'delivery' as CheckoutOrderType, pickup: 'takeaway' as PickupOption, icon: MapPin, label: 'Delivery' },
-              ] as const).map(({ type, pickup, icon: Icon, label }) => {
-                const isActive =
-                  type === 'delivery'
-                    ? activeOrderType === 'delivery'
-                    : activeOrderType !== 'delivery' && pickupOption === pickup;
-                return (
-                  <button
-                    key={label}
-                    onClick={() => {
-                      if (type === 'delivery') {
-                        handleOrderTypeChoice('delivery');
-                      } else {
-                        handleOrderTypeChoice('pickup');
-                        handlePickupChoice(pickup);
-                      }
-                    }}
-                    className={`flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3 transition-all ${
-                      isActive
-                        ? 'border-brand-gold bg-brand-gold/10'
-                        : 'border-brand-border hover:border-brand-gold/40'
-                    }`}
-                  >
-                    <Icon size={18} className={isActive ? 'text-brand-gold' : 'text-brand-text-dim'} strokeWidth={2} />
-                    <span className={`text-[11px] font-bold ${isActive ? 'text-white' : 'text-brand-text-muted'}`}>{label}</span>
-                    {type === 'pickup' && pickup === 'takeaway' && (
-                      <span className="text-[9px] text-brand-text-dim">+₹{TAKEAWAY_CHARGE}</span>
-                    )}
-                    {type === 'delivery' && (
-                      <span className="text-[9px] text-brand-text-dim">Online only</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {activeOrderType === 'delivery' && (
-            <div className="px-4 pb-4 border-t border-brand-border pt-3 space-y-3">
-              <LocationPicker
-                address={deliveryAddress}
-                pincode={deliveryPincode}
-                onAddressChange={setDeliveryAddress}
-                onPincodeChange={setDeliveryPincode}
-                onLatChange={setDeliveryLat}
-                onLngChange={setDeliveryLng}
-                onExtendedConfirm={(data: MapConfirmData) => {
-                  setDeliveryHouseNumber(data.houseNumber);
-                  setDeliveryBuildingName(data.buildingName);
-                  setDeliveryFloorNumber(data.floorNumber);
-                  setDeliveryLandmark(data.landmark);
-                  setDeliveryInstructions(data.deliveryInstructions);
-                  setDetectedGpsLat(data.detectedGpsLat);
-                  setDetectedGpsLng(data.detectedGpsLng);
-                  setAddressConfidence(data.confidenceScore);
-                  setSavedAddressId(data.savedAddressId);
-                }}
-              />
-              {deliveryLookupLoading && (
-                <div className="rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-2.5 text-[12px] font-semibold text-sky-400">
-                  Checking delivery availability...
-                </div>
-              )}
-              {!deliveryLookupLoading && deliveryZone && (
-                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5">
-                  <p className="text-[13px] font-bold text-emerald-400">{deliveryZone.area_name}</p>
-                  <p className="text-[11px] text-emerald-300 mt-0.5">
-                    {deliveryFee === 0
-                      ? 'Free delivery'
-                      : `Delivery fee ₹${deliveryFee.toFixed(0)}`}
-                    {deliveryEstimatedTime > 0 ? ` · ETA ~${deliveryEstimatedTime} min` : ''}
-                    {` · Free delivery above ₹${FREE_DELIVERY_THRESHOLD}`}
-                  </p>
-                </div>
-              )}
-              {!deliveryLookupLoading && !deliveryZone && deliveryLookupError && deliveryPincode.trim().length === 6 && (
-                <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-[12px] font-semibold text-red-300">
-                  {deliveryLookupError}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
 
         <div className="bg-brand-surface rounded-xl p-4 border border-brand-border mb-6">
           <div className="space-y-2 text-[14px]">
@@ -1935,8 +1730,23 @@ export default function CartPage() {
             total={total}
             isFreeOrder={isFreeOrder}
             submitting={submitting}
+            couponCode={couponCode}
+            appliedOffer={appliedOffer}
+            couponError={couponError}
+            couponRewardItems={couponRewardItems}
+            automaticRewardItems={automaticRewardItems}
+            reviewRewardCoupons={reviewRewardCoupons}
+            selectedReviewRewardCouponId={selectedReviewRewardCouponId}
+            applicableAutomaticOffers={applicableAutomaticOffers}
+            selectedAutomaticOfferId={selectedAutomaticOfferId}
+            featuredAutomaticOffer={featuredAutomaticOffer}
+            automaticOfferApplied={automaticOfferApplied}
+            multipleAutomaticOffersAvailable={multipleAutomaticOffersAvailable}
             onClose={closeCheckoutFlow}
-            onBack={() => setCheckoutStep('customer')}
+            onBack={() => {
+              if (checkoutStep === 'coupon') setCheckoutStep('service');
+              else if (checkoutStep === 'payment') setCheckoutStep('coupon');
+            }}
             onNameChange={setName}
             onEmailChange={setEmail}
             onPhoneChange={setPhone}
@@ -1944,7 +1754,13 @@ export default function CartPage() {
             onSelectPickupOption={handlePickupChoice}
             onAddressChange={setDeliveryAddress}
             onPincodeChange={setDeliveryPincode}
-            onContinueCustomer={handleCustomerContinue}
+            onCouponCodeChange={(v) => setCouponCode(v.toUpperCase())}
+            onApplyCoupon={applyCoupon}
+            onRemoveCoupon={() => { setAppliedOffer(null); setCouponCode(''); }}
+            onSelectReviewRewardCoupon={setSelectedReviewRewardCouponId}
+            onSelectAutomaticOffer={setSelectedAutomaticOfferId}
+            onContinueService={handleServiceContinue}
+            onContinueCoupon={handleCouponContinue}
             onSelectPaymentMethod={handlePaymentChoice}
             onContinuePayment={handlePaymentContinue}
             onLatChange={setDeliveryLat}
@@ -2018,6 +1834,18 @@ function CheckoutFlowModal({
   total,
   isFreeOrder,
   submitting,
+  couponCode,
+  appliedOffer,
+  couponError,
+  couponRewardItems,
+  automaticRewardItems,
+  reviewRewardCoupons,
+  selectedReviewRewardCouponId,
+  applicableAutomaticOffers,
+  selectedAutomaticOfferId,
+  featuredAutomaticOffer,
+  automaticOfferApplied,
+  multipleAutomaticOffersAvailable,
   onClose,
   onBack,
   onNameChange,
@@ -2027,7 +1855,13 @@ function CheckoutFlowModal({
   onSelectPickupOption,
   onAddressChange,
   onPincodeChange,
-  onContinueCustomer,
+  onCouponCodeChange,
+  onApplyCoupon,
+  onRemoveCoupon,
+  onSelectReviewRewardCoupon,
+  onSelectAutomaticOffer,
+  onContinueService,
+  onContinueCoupon,
   onSelectPaymentMethod,
   onContinuePayment,
   onLatChange,
@@ -2061,6 +1895,18 @@ function CheckoutFlowModal({
   total: number;
   isFreeOrder: boolean;
   submitting: boolean;
+  couponCode: string;
+  appliedOffer: Offer | null;
+  couponError: string;
+  couponRewardItems: OfferRewardItem[];
+  automaticRewardItems: OfferRewardItem[];
+  reviewRewardCoupons: ReviewRewardCoupon[];
+  selectedReviewRewardCouponId: string | null;
+  applicableAutomaticOffers: Array<{ offer: Offer; discountAmount: number; freeItems: OfferRewardItem[] }>;
+  selectedAutomaticOfferId: string | null;
+  featuredAutomaticOffer: Offer | null;
+  automaticOfferApplied: boolean;
+  multipleAutomaticOffersAvailable: boolean;
   onClose: () => void;
   onBack: () => void;
   onNameChange: (value: string) => void;
@@ -2070,7 +1916,13 @@ function CheckoutFlowModal({
   onSelectPickupOption: (option: PickupOption) => void;
   onAddressChange: (value: string) => void;
   onPincodeChange: (value: string) => void;
-  onContinueCustomer: () => void;
+  onCouponCodeChange: (value: string) => void;
+  onApplyCoupon: () => void;
+  onRemoveCoupon: () => void;
+  onSelectReviewRewardCoupon: (id: string | null) => void;
+  onSelectAutomaticOffer: (id: string | null) => void;
+  onContinueService: () => void;
+  onContinueCoupon: () => void;
   onSelectPaymentMethod: (method: PaymentMethod) => void;
   onContinuePayment: () => void;
   onLatChange: (lat: number | null) => void;
@@ -2078,46 +1930,61 @@ function CheckoutFlowModal({
   onExtendedConfirm: (data: MapConfirmData) => void;
 }) {
   const isDelivery = orderType === 'delivery';
-  const orderTypeSummary = isDelivery
-    ? deliveryZone
-      ? `Delivery to ${deliveryZone.area_name}. Fee ₹${deliveryFee.toFixed(0)}${deliveryEstimatedTime > 0 ? `, ETA ~${deliveryEstimatedTime} min` : ''}.`
-      : deliveryLookupLoading
-        ? 'Checking delivery availability for your pincode.'
-        : deliveryLookupError || 'Share your live location or search your address to check delivery.'
-    : pickupOption === 'takeaway'
-      ? `Takeaway selected. Includes ₹${TAKEAWAY_CHARGE} takeaway charge.`
-      : 'Dine In selected. No takeaway charge.';
-  const stepLabel = step === 'customer' ? '1 of 2' : '2 of 2';
-  const heading = step === 'customer'
-    ? (isSignedIn ? 'Confirm details' : 'Guest or sign in')
-    : (isFreeOrder ? 'Place order' : 'Choose payment');
+  const stepNumber = step === 'service' ? 1 : step === 'coupon' ? 2 : 3;
+  const heading = step === 'service'
+    ? 'How would you like it?'
+    : step === 'coupon'
+      ? 'Save on your order'
+      : isFreeOrder ? 'Place order' : 'Payment';
   const cashLabel = isDelivery ? 'Cash on Delivery' : 'Pay at Counter';
   const cashDescription = isDelivery ? 'Pay when your order arrives' : 'Pay when you collect';
+
+  const serviceModeSummary = isDelivery
+    ? deliveryZone
+      ? `Delivery · ${deliveryZone.area_name}${deliveryFee > 0 ? ` · ₹${deliveryFee.toFixed(0)} fee` : ' · Free delivery'}${deliveryEstimatedTime > 0 ? ` · ~${deliveryEstimatedTime} min` : ''}`
+      : deliveryLookupLoading
+        ? 'Delivery · Checking availability…'
+        : 'Delivery'
+    : pickupOption === 'takeaway'
+      ? `Takeaway · +₹${TAKEAWAY_CHARGE} charge`
+      : 'Dine In · No extra charge';
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[90] flex items-center justify-center overflow-y-auto bg-black/70 px-4 py-6"
+      className="fixed inset-0 z-[90] flex items-end justify-center bg-black/70 sm:items-center sm:px-4 sm:py-6"
       onClick={onClose}
     >
       <motion.div
-        initial={{ opacity: 0, y: 24, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 24, scale: 0.98 }}
-        transition={{ duration: 0.18 }}
-        className="max-h-[calc(100vh-3rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-brand-border bg-brand-bg p-5 shadow-elevated"
-        onClick={(event) => event.stopPropagation()}
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 40 }}
+        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+        className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-3xl border-t border-brand-border bg-brand-bg p-5 shadow-elevated sm:rounded-2xl sm:border"
+        onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-4 flex items-start justify-between gap-4">
+        {/* Header */}
+        <div className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-brand-gold">
-              Step {stepLabel}
-            </p>
-            <h2 className="mt-1 text-xl font-extrabold tracking-tight text-white">
-              {heading}
-            </h2>
+            <div className="flex items-center gap-2 mb-1">
+              {(step === 'coupon' || step === 'payment') && (
+                <button
+                  onClick={onBack}
+                  disabled={submitting}
+                  className="flex items-center gap-1 text-[13px] font-bold text-brand-gold hover:text-brand-gold/80 disabled:opacity-60 transition-colors"
+                >
+                  <ArrowLeft size={14} strokeWidth={2.5} />
+                  Back
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-gold text-[11px] font-black text-brand-bg">{stepNumber}</span>
+              <span className="text-[11px] font-bold text-brand-text-dim uppercase tracking-wider">Step {stepNumber} of 3</span>
+            </div>
+            <h2 className="mt-1 text-xl font-extrabold tracking-tight text-white">{heading}</h2>
           </div>
           <button
             onClick={onClose}
@@ -2128,70 +1995,56 @@ function CheckoutFlowModal({
           </button>
         </div>
 
-        {step === 'customer' ? (
+        {/* ── Step 1: Service Mode ── */}
+        {step === 'service' && (
           <div className="space-y-4">
-            <div className="rounded-xl border border-brand-border bg-brand-surface px-4 py-3">
-              <div className="flex items-center justify-between gap-3 text-[13px]">
-                <span className="font-semibold text-brand-text-muted">Service mode</span>
-                <span className="font-black text-brand-gold">{isDelivery ? 'Delivery' : pickupOption === 'takeaway' ? 'Takeaway' : 'Dine In'}</span>
-              </div>
-              <p className="mt-1 text-[11px] font-medium text-brand-text-dim">{orderTypeSummary}</p>
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                <button
-                  onClick={() => {
-                    onSelectOrderType('pickup');
-                    onSelectPickupOption('dine_in');
-                  }}
-                  disabled={submitting}
-                  className={`flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-[12px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                    !isDelivery && pickupOption === 'dine_in'
-                      ? 'border-brand-gold bg-brand-gold/10 text-white'
-                      : 'border-brand-border text-brand-text-muted hover:border-brand-gold/40 hover:text-white'
-                  }`}
-                >
-                  <Store size={13} className={!isDelivery && pickupOption === 'dine_in' ? 'text-brand-gold' : 'text-brand-text-dim'} />
-                  Dine In
-                </button>
-                <button
-                  onClick={() => {
-                    onSelectOrderType('pickup');
-                    onSelectPickupOption('takeaway');
-                  }}
-                  disabled={submitting}
-                  className={`flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-[12px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                    !isDelivery && pickupOption === 'takeaway'
-                      ? 'border-brand-gold bg-brand-gold/10 text-white'
-                      : 'border-brand-border text-brand-text-muted hover:border-brand-gold/40 hover:text-white'
-                  }`}
-                >
-                  <ShoppingBag size={13} className={!isDelivery && pickupOption === 'takeaway' ? 'text-brand-gold' : 'text-brand-text-dim'} />
-                  Takeaway
-                </button>
-                <button
-                  onClick={() => onSelectOrderType('delivery')}
-                  disabled={submitting}
-                  className={`flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-[12px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                    isDelivery
-                      ? 'border-brand-gold bg-brand-gold/10 text-white'
-                      : 'border-brand-border text-brand-text-muted hover:border-brand-gold/40 hover:text-white'
-                  }`}
-                >
-                  <MapPin size={13} className={isDelivery ? 'text-brand-gold' : 'text-brand-text-dim'} />
-                  Delivery
-                </button>
-              </div>
+            <div className="grid grid-cols-3 gap-3">
+              {([
+                { type: 'pickup' as CheckoutOrderType, pickup: 'dine_in' as PickupOption, icon: Store, label: 'Dine In', sub: 'No extra charge' },
+                { type: 'pickup' as CheckoutOrderType, pickup: 'takeaway' as PickupOption, icon: ShoppingBag, label: 'Takeaway', sub: `+₹${TAKEAWAY_CHARGE}` },
+                { type: 'delivery' as CheckoutOrderType, pickup: 'takeaway' as PickupOption, icon: MapPin, label: 'Delivery', sub: 'Online only' },
+              ] as const).map(({ type, pickup, icon: Icon, label, sub }) => {
+                const isActive = type === 'delivery'
+                  ? isDelivery
+                  : !isDelivery && pickupOption === pickup;
+                return (
+                  <button
+                    key={label}
+                    onClick={() => {
+                      if (type === 'delivery') {
+                        onSelectOrderType('delivery');
+                      } else {
+                        onSelectOrderType('pickup');
+                        onSelectPickupOption(pickup);
+                      }
+                    }}
+                    disabled={submitting}
+                    className={`flex flex-col items-center gap-2 rounded-2xl border-2 px-2 py-4 transition-all disabled:opacity-60 ${
+                      isActive
+                        ? 'border-brand-gold bg-brand-gold/10'
+                        : 'border-brand-border hover:border-brand-gold/40'
+                    }`}
+                  >
+                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${isActive ? 'bg-brand-gold/20' : 'bg-brand-surface-light'}`}>
+                      <Icon size={20} className={isActive ? 'text-brand-gold' : 'text-brand-text-dim'} strokeWidth={2} />
+                    </div>
+                    <span className={`text-[13px] font-black ${isActive ? 'text-white' : 'text-brand-text-muted'}`}>{label}</span>
+                    <span className={`text-[10px] font-semibold ${isActive ? 'text-brand-gold' : 'text-brand-text-dim'}`}>{sub}</span>
+                  </button>
+                );
+              })}
             </div>
 
             {isDelivery && (
-              <div className="rounded-xl border border-brand-border bg-brand-surface p-4">
-                <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-brand-border bg-brand-surface p-4 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
                   <div className="relative">
                     <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-text-dim" />
                     <input
                       type="text"
-                      placeholder="Recipient name *"
+                      placeholder="Your name *"
                       value={name}
-                      onChange={(event) => onNameChange(event.target.value)}
+                      onChange={(e) => onNameChange(e.target.value)}
                       className="input-field pl-9 text-[14px]"
                       autoComplete="name"
                     />
@@ -2201,15 +2054,14 @@ function CheckoutFlowModal({
                     <input
                       type="tel"
                       inputMode="numeric"
-                      placeholder="Contact mobile *"
+                      placeholder="Mobile number *"
                       value={phone}
-                      onChange={(event) => onPhoneChange(event.target.value.replace(/\D/g, '').slice(0, 10))}
+                      onChange={(e) => onPhoneChange(e.target.value.replace(/\D/g, '').slice(0, 10))}
                       className="input-field pl-9 text-[14px]"
                       autoComplete="tel"
                     />
                   </div>
                 </div>
-
                 <LocationPicker
                   address={address}
                   pincode={pincode}
@@ -2219,138 +2071,238 @@ function CheckoutFlowModal({
                   onLngChange={onLngChange}
                   onExtendedConfirm={onExtendedConfirm}
                 />
-
                 {deliveryLookupLoading && (
-                  <div className="mt-3 rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-[12px] font-semibold text-sky-400">
-                    Checking delivery availability for this pincode.
+                  <div className="rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-2.5 text-[12px] font-semibold text-sky-400">
+                    Checking delivery availability…
                   </div>
                 )}
-
                 {!deliveryLookupLoading && deliveryZone && (
-                  <div className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3">
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5">
                     <p className="text-[13px] font-bold text-emerald-400">{deliveryZone.area_name}</p>
-                    <p className="mt-1 text-[12px] text-emerald-300">
-                      {deliveryFee === 0
-                        ? 'Free delivery'
-                        : `Delivery fee ₹${deliveryFee.toFixed(0)}`}
-                      {deliveryEstimatedTime > 0 ? ` • ETA ~${deliveryEstimatedTime} min` : ''}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-emerald-300/70">
-                      Free delivery above ₹{FREE_DELIVERY_THRESHOLD}
+                    <p className="mt-0.5 text-[11px] text-emerald-300">
+                      {deliveryFee === 0 ? 'Free delivery' : `Fee ₹${deliveryFee.toFixed(0)}`}
+                      {deliveryEstimatedTime > 0 ? ` · ~${deliveryEstimatedTime} min` : ''}
+                      {deliveryMinimumOrder > 0 ? ` · Min ₹${deliveryMinimumOrder}` : ''}
                     </p>
                   </div>
                 )}
-
                 {!deliveryLookupLoading && !deliveryZone && deliveryLookupError && pincode.trim().length === 6 && (
-                  <div className="mt-3 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-[12px] font-semibold text-red-300">
+                  <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-[12px] font-semibold text-red-300">
                     {deliveryLookupError}
                   </div>
                 )}
               </div>
             )}
 
-            {!isSignedIn && !isDelivery ? (
-              <div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <div className="rounded-lg border-2 border-brand-gold bg-brand-gold/10 p-3 text-left">
-                    <span className="block text-[14px] font-extrabold text-white">Continue as guest</span>
-                    <span className="mt-1 block text-[12px] font-medium text-brand-text-muted">
-                      Name and email only.
-                    </span>
-                  </div>
-                  <Link
-                    to="/auth"
-                    state={{ from: '/cart' }}
-                    className="rounded-lg border-2 border-brand-border bg-brand-surface p-3 text-left transition-colors hover:border-brand-gold/40"
-                  >
-                    <span className="block text-[14px] font-extrabold text-white">Sign in for faster checkout</span>
-                    <span className="mt-1 block text-[12px] font-medium text-brand-text-muted">
-                      Use saved details and rewards.
-                    </span>
-                  </Link>
-                </div>
-              </div>
-            ) : isSignedIn ? (
-              <div className="flex items-center gap-3 rounded-lg border border-brand-gold/20 bg-brand-gold/5 p-3">
-                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-brand-gold/10">
-                  <User size={18} className="text-brand-gold" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-[14px] font-bold text-white">Signed in for faster checkout</h3>
-                  <p className="text-[12px] text-brand-text-dim">Your receipt will go to the email below.</p>
-                </div>
-              </div>
-            ) : null}
-
-            {!isDelivery && (
-              <>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="relative">
-                    <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-text-dim" />
-                    <input
-                      type="text"
-                      placeholder="Your name *"
-                      value={name}
-                      onChange={(event) => onNameChange(event.target.value)}
-                      className="input-field pl-9 text-[14px]"
-                      autoComplete="name"
-                      autoFocus={!name}
-                    />
-                  </div>
-                  <div className="relative">
-                    <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-text-dim" />
-                    <input
-                      type="email"
-                      placeholder="Email for receipt *"
-                      value={email}
-                      onChange={(event) => onEmailChange(event.target.value)}
-                      className="input-field pl-9 text-[14px]"
-                      autoComplete="email"
-                    />
-                  </div>
-                </div>
-                <p className="text-[12px] font-medium text-brand-text-dim">
-                  We will send your order receipt to this email.
-                </p>
-              </>
-            )}
-
-            <CheckoutBillSummary
-              subtotal={subtotal}
-              couponDiscount={couponDiscount}
-              automaticDiscount={automaticDiscount}
-              reviewRewardDiscount={reviewRewardDiscount}
-              discount={discount}
-              addOnTotal={addOnTotal}
-              rewardItemCount={rewardItemCount}
-              deliveryFee={deliveryFee}
-              takeawayFee={takeawayFee}
-              total={total}
-            />
-
             <button
-              onClick={onContinueCustomer}
+              onClick={onContinueService}
               disabled={submitting}
-              className="btn-primary w-full rounded-xl py-3 text-[14px] font-black disabled:cursor-not-allowed disabled:opacity-60"
+              className="btn-primary w-full rounded-xl py-3.5 text-[15px] font-black disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isFreeOrder ? 'Continue' : 'Continue to Payment'}
+              Continue
             </button>
           </div>
-        ) : (
+        )}
+
+        {/* ── Step 2: Coupon ── */}
+        {step === 'coupon' && (
           <div className="space-y-4">
-            <button
-              onClick={onBack}
-              disabled={submitting}
-              className="text-[13px] font-bold text-brand-gold transition-colors hover:text-brand-gold-soft disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Back to details
-            </button>
-            <div className="rounded-xl border border-brand-border bg-brand-surface px-4 py-3">
-              <div className="flex items-center justify-between gap-3 text-[13px]">
-                <span className="font-semibold text-brand-text-muted">Service mode</span>
-                <span className="font-black text-brand-gold">{isDelivery ? 'Delivery' : pickupOption === 'takeaway' ? 'Takeaway' : 'Dine In'}</span>
+            <div className="flex items-center gap-2 rounded-xl border border-brand-border bg-brand-surface px-3 py-2.5 text-[12px]">
+              {isDelivery ? <MapPin size={13} className="text-brand-gold flex-shrink-0" /> : pickupOption === 'takeaway' ? <ShoppingBag size={13} className="text-brand-gold flex-shrink-0" /> : <Store size={13} className="text-brand-gold flex-shrink-0" />}
+              <span className="font-semibold text-brand-text-muted">{serviceModeSummary}</span>
+            </div>
+
+            <div className="rounded-2xl border border-brand-border bg-brand-surface p-4 space-y-3">
+              <p className="text-[13px] font-bold text-white flex items-center gap-2">
+                <Tag size={14} className="text-brand-gold" />
+                Have a coupon code?
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Enter code"
+                  value={couponCode}
+                  onChange={(e) => onCouponCodeChange(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && onApplyCoupon()}
+                  className="input-field flex-1 text-[14px] font-semibold tracking-wider"
+                />
+                <button
+                  onClick={onApplyCoupon}
+                  className="btn-outline px-4 py-2 text-[13px] font-bold rounded-lg"
+                >
+                  Apply
+                </button>
               </div>
-              <p className="mt-1 text-[11px] font-medium text-brand-text-dim">{orderTypeSummary}</p>
+              {couponError && <p className="text-red-400 text-[12px]">{couponError}</p>}
+              {appliedOffer && (
+                <div className="flex items-center justify-between gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-[12px]">
+                  <span className="font-semibold text-emerald-300">
+                    {appliedOffer.title} — {couponRewardItems.length > 0 ? `${getPromoRewardSummary(couponRewardItems)} free` : getOfferRuleSummary(appliedOffer)}
+                  </span>
+                  <button onClick={onRemoveCoupon} className="font-bold text-brand-text-muted hover:text-white flex-shrink-0">Remove</button>
+                </div>
+              )}
+            </div>
+
+            {reviewRewardCoupons.length > 0 && (
+              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Gift size={15} className="text-emerald-300" />
+                    <span className="text-[13px] font-bold text-emerald-200">Review rewards</span>
+                  </div>
+                  {selectedReviewRewardCouponId && (
+                    <button onClick={() => onSelectReviewRewardCoupon(null)} className="text-[12px] font-bold text-brand-text-muted hover:text-white">Remove</button>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {reviewRewardCoupons.map((coupon) => {
+                    const isSelected = selectedReviewRewardCouponId === coupon.id;
+                    const amt = calculateReviewRewardDiscount(subtotal, Number(coupon.discount_percentage || 0));
+                    return (
+                      <button
+                        key={coupon.id}
+                        onClick={() => onSelectReviewRewardCoupon(coupon.id)}
+                        className={`w-full rounded-xl border px-3 py-2.5 text-left transition-colors ${isSelected ? 'border-emerald-400/40 bg-emerald-500/15' : 'border-brand-border bg-brand-surface/40 hover:border-emerald-500/30'}`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`text-[13px] font-bold ${isSelected ? 'text-emerald-300' : 'text-white'}`}>{coupon.code}</span>
+                          <span className={`text-[12px] font-black ${isSelected ? 'text-emerald-200' : 'text-emerald-400'}`}>Save ₹{amt.toFixed(0)}</span>
+                        </div>
+                        <p className={`mt-0.5 text-[11px] ${isSelected ? 'text-emerald-200' : 'text-brand-text-muted'}`}>10% off from your item review</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {featuredAutomaticOffer && (
+              <div className="rounded-2xl border border-brand-gold/20 bg-brand-gold/[0.06] p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[13px] font-bold text-brand-gold">
+                    {multipleAutomaticOffersAvailable ? 'Choose an offer' : featuredAutomaticOffer.title}
+                  </span>
+                  {multipleAutomaticOffersAvailable && automaticOfferApplied && (
+                    <button onClick={() => onSelectAutomaticOffer(null)} className="text-[12px] font-bold text-brand-text-muted hover:text-white">Change</button>
+                  )}
+                </div>
+                {!multipleAutomaticOffersAvailable && (
+                  <p className={`text-[12px] ${automaticOfferApplied ? 'text-emerald-400' : 'text-brand-gold/80'}`}>
+                    {automaticOfferApplied
+                      ? automaticRewardItems.length > 0
+                        ? `${getPromoRewardSummary(automaticRewardItems)} added free`
+                        : `You save ₹${automaticDiscount.toFixed(0)}`
+                      : getOfferRuleSummary(featuredAutomaticOffer)}
+                  </p>
+                )}
+                {multipleAutomaticOffersAvailable && (
+                  <div className="space-y-2">
+                    {applicableAutomaticOffers.map((result) => {
+                      const isSelected = selectedAutomaticOfferId === result.offer.id;
+                      const valueText = result.freeItems.length > 0 ? `${getPromoRewardSummary(result.freeItems)} free` : `Save ₹${result.discountAmount.toFixed(0)}`;
+                      return (
+                        <button
+                          key={result.offer.id}
+                          onClick={() => onSelectAutomaticOffer(result.offer.id)}
+                          className={`w-full rounded-xl border px-3 py-2.5 text-left transition-colors ${isSelected ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-brand-border bg-brand-surface/40 hover:border-brand-gold/30'}`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`text-[13px] font-bold ${isSelected ? 'text-emerald-400' : 'text-white'}`}>{result.offer.title}</span>
+                            <span className={`text-[11px] font-black ${isSelected ? 'text-emerald-300' : 'text-brand-gold'}`}>{valueText}</span>
+                          </div>
+                          <p className={`mt-0.5 text-[11px] ${isSelected ? 'text-emerald-300' : 'text-brand-text-muted'}`}>{getOfferRuleSummary(result.offer)}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {discount > 0 && (
+              <div className="flex items-center justify-between rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-4 py-3">
+                <span className="text-[13px] font-bold text-emerald-300">Total savings</span>
+                <span className="text-[15px] font-black text-emerald-300">-₹{discount.toFixed(0)}</span>
+              </div>
+            )}
+
+            <button
+              onClick={onContinueCoupon}
+              disabled={submitting}
+              className="btn-primary w-full rounded-xl py-3.5 text-[15px] font-black disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {discount > 0 ? 'Continue with Savings' : 'Continue'}
+            </button>
+          </div>
+        )}
+
+        {/* ── Step 3: Payment ── */}
+        {step === 'payment' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 rounded-xl border border-brand-border bg-brand-surface px-3 py-2.5 text-[12px]">
+              {isDelivery ? <MapPin size={13} className="text-brand-gold flex-shrink-0" /> : pickupOption === 'takeaway' ? <ShoppingBag size={13} className="text-brand-gold flex-shrink-0" /> : <Store size={13} className="text-brand-gold flex-shrink-0" />}
+              <span className="font-semibold text-brand-text-muted">{serviceModeSummary}</span>
+            </div>
+
+            {!isSignedIn && !isDelivery && (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="rounded-xl border-2 border-brand-gold bg-brand-gold/10 p-3 text-left">
+                  <span className="block text-[14px] font-extrabold text-white">Continue as guest</span>
+                  <span className="mt-1 block text-[11px] text-brand-text-muted">Name and email only.</span>
+                </div>
+                <Link
+                  to="/auth"
+                  state={{ from: '/cart' }}
+                  className="rounded-xl border-2 border-brand-border bg-brand-surface p-3 text-left transition-colors hover:border-brand-gold/40"
+                >
+                  <span className="block text-[14px] font-extrabold text-white">Sign in</span>
+                  <span className="mt-1 block text-[11px] text-brand-text-muted">Faster checkout + rewards.</span>
+                </Link>
+              </div>
+            )}
+
+            {isSignedIn && (
+              <div className="flex items-center gap-3 rounded-xl border border-brand-gold/20 bg-brand-gold/5 px-3 py-2.5">
+                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-brand-gold/10">
+                  <User size={16} className="text-brand-gold" />
+                </div>
+                <div>
+                  <p className="text-[13px] font-bold text-white">Signed in</p>
+                  <p className="text-[11px] text-brand-text-dim">Receipt will go to the email below.</p>
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-2xl border border-brand-border bg-brand-surface p-4 space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="relative">
+                  <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-text-dim" />
+                  <input
+                    type="text"
+                    placeholder="Your name *"
+                    value={name}
+                    onChange={(e) => onNameChange(e.target.value)}
+                    className="input-field pl-9 text-[14px]"
+                    autoComplete="name"
+                    autoFocus={!name}
+                  />
+                </div>
+                <div className="relative">
+                  <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-text-dim" />
+                  <input
+                    type="email"
+                    placeholder="Email for receipt *"
+                    value={email}
+                    onChange={(e) => onEmailChange(e.target.value)}
+                    className="input-field pl-9 text-[14px]"
+                    autoComplete="email"
+                  />
+                </div>
+              </div>
+              {!isDelivery && (
+                <p className="text-[11px] text-brand-text-dim">We will send your order receipt to this email.</p>
+              )}
             </div>
 
             <CheckoutBillSummary
@@ -2370,83 +2322,65 @@ function CheckoutFlowModal({
               <button
                 onClick={onContinuePayment}
                 disabled={submitting}
-                className="btn-primary w-full rounded-xl py-3 text-[14px] font-black disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-primary w-full rounded-xl py-3.5 text-[15px] font-black disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Place Free Order
+                {submitting ? 'Placing Order…' : 'Place Free Order'}
               </button>
             ) : isDelivery ? (
               <div className="space-y-3">
-                <div className="flex items-center gap-3 rounded-xl border border-brand-gold/30 bg-brand-gold/8 px-4 py-3" style={{ background: 'rgba(216,178,78,0.07)' }}>
+                <div className="flex items-center gap-3 rounded-xl border border-brand-gold/30 px-4 py-3" style={{ background: 'rgba(216,178,78,0.07)' }}>
                   <CreditCard size={18} className="text-brand-gold flex-shrink-0" />
                   <div>
                     <p className="text-[13px] font-bold text-white">Online payment only</p>
-                    <p className="text-[11px] text-brand-text-dim">Delivery orders require payment via UPI, card, or net banking.</p>
+                    <p className="text-[11px] text-brand-text-dim">Delivery orders require UPI, card, or net banking.</p>
                   </div>
                 </div>
                 <button
                   onClick={onContinuePayment}
                   disabled={submitting}
-                  className="btn-primary w-full rounded-xl py-3 text-[14px] font-black disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-primary w-full rounded-xl py-3.5 text-[15px] font-black disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Proceed to Online Payment
+                  {submitting ? 'Opening Payment…' : `Pay ₹${total.toFixed(0)} Online`}
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    onClick={() => onSelectPaymentMethod('card')}
+                    disabled={submitting}
+                    className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 px-3 py-4 text-center transition-all disabled:opacity-60 ${
+                      paymentMethod === 'card' ? 'border-brand-gold bg-brand-gold/10' : 'border-brand-border bg-brand-surface hover:border-brand-gold/40'
+                    }`}
+                  >
+                    <CreditCard size={22} className={paymentMethod === 'card' ? 'text-brand-gold' : 'text-brand-text-dim'} />
+                    <span className={`text-[13px] font-bold ${paymentMethod === 'card' ? 'text-white' : 'text-brand-text-muted'}`}>Pay Online</span>
+                    <span className="text-[11px] text-brand-text-dim">UPI, cards & more</span>
+                  </button>
+                  <button
+                    onClick={() => onSelectPaymentMethod('cod')}
+                    disabled={submitting}
+                    className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 px-3 py-4 text-center transition-all disabled:opacity-60 ${
+                      paymentMethod === 'cod' ? 'border-brand-gold bg-brand-gold/10' : 'border-brand-border bg-brand-surface hover:border-brand-gold/40'
+                    }`}
+                  >
+                    <Wallet size={22} className={paymentMethod === 'cod' ? 'text-brand-gold' : 'text-brand-text-dim'} />
+                    <span className={`text-[13px] font-bold ${paymentMethod === 'cod' ? 'text-white' : 'text-brand-text-muted'}`}>{cashLabel}</span>
+                    <span className="text-[11px] text-brand-text-dim">{cashDescription}</span>
+                  </button>
+                </div>
                 <button
-                  onClick={() => onSelectPaymentMethod('card')}
+                  onClick={onContinuePayment}
                   disabled={submitting}
-                  className={`flex min-h-[132px] flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 text-center transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
-                    paymentMethod === 'card'
-                      ? 'border-brand-gold bg-brand-gold/10'
-                      : 'border-brand-border bg-brand-surface hover:border-brand-gold/40'
-                  }`}
+                  className="btn-primary w-full rounded-xl py-3.5 text-[15px] font-black disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-                    paymentMethod === 'card' ? 'bg-brand-gold/20' : 'bg-brand-surface-light'
-                  }`}>
-                    <CreditCard size={20} className={paymentMethod === 'card' ? 'text-brand-gold' : 'text-brand-text-dim'} />
-                  </div>
-                  <span className={`block text-[14px] font-bold ${paymentMethod === 'card' ? 'text-white' : 'text-brand-text-muted'}`}>
-                    Pay Online
-                  </span>
-                  <span className="text-[11px] text-brand-text-dim">UPI, cards, and more</span>
-                </button>
-                <button
-                  onClick={() => onSelectPaymentMethod('cod')}
-                  disabled={submitting}
-                  className={`flex min-h-[132px] flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 text-center transition-all disabled:cursor-not-allowed disabled:opacity-60 ${
-                    paymentMethod === 'cod'
-                      ? 'border-brand-gold bg-brand-gold/10'
-                      : 'border-brand-border bg-brand-surface hover:border-brand-gold/40'
-                  }`}
-                >
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-                    paymentMethod === 'cod' ? 'bg-brand-gold/20' : 'bg-brand-surface-light'
-                  }`}>
-                    <Wallet size={20} className={paymentMethod === 'cod' ? 'text-brand-gold' : 'text-brand-text-dim'} />
-                  </div>
-                  <span className={`block text-[14px] font-bold ${paymentMethod === 'cod' ? 'text-white' : 'text-brand-text-muted'}`}>
-                    {cashLabel}
-                  </span>
-                  <span className="text-[11px] text-brand-text-dim">
-                    {cashDescription}
-                  </span>
+                  {submitting
+                    ? paymentMethod === 'card' ? 'Opening Payment…' : 'Placing Order…'
+                    : paymentMethod === 'card'
+                      ? `Pay ₹${total.toFixed(0)} Online`
+                      : 'Place Order'}
                 </button>
               </div>
-            )}
-            {!isFreeOrder && !isDelivery && (
-              <button
-                onClick={onContinuePayment}
-                disabled={submitting}
-                className="btn-primary w-full rounded-xl py-3 text-[14px] font-black disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {paymentMethod === 'card'
-                  ? 'Proceed to Online Payment'
-                  : isDelivery
-                    ? 'Place Delivery Order'
-                    : 'Place Order and Pay at Counter'}
-              </button>
             )}
           </div>
         )}
