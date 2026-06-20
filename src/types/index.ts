@@ -200,6 +200,12 @@ export interface Order {
   detected_gps_lng: number | null;
   address_confidence: number | null;
   saved_address_id: string | null;
+  delivery_partner_id: string | null;
+  delivery_partner_lat: number | null;
+  delivery_partner_lng: number | null;
+  delivery_partner_location_updated_at: string | null;
+  delivery_otp: string | null;
+  picked_up_at: string | null;
 }
 
 export interface OrderItem {
