@@ -1023,10 +1023,11 @@ export default function OrderSuccessPage() {
                   Check Payment Status
                 </button>
               )}
-              {canCancelOrder && !reconcilingPayment && !showCancelConfirm && (
+              {canCancelOrder && !showCancelConfirm && (
                 <button
                   onClick={() => setShowCancelConfirm(true)}
-                  className="w-full py-2.5 rounded-xl border border-rose-500/40 text-rose-400 text-[13px] font-medium hover:bg-rose-500/10 transition-colors"
+                  disabled={reconcilingPayment}
+                  className="w-full py-2.5 rounded-xl border border-rose-500/40 text-rose-400 text-[13px] font-medium hover:bg-rose-500/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Cancel this order
                 </button>
