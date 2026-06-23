@@ -408,7 +408,7 @@ function PromoBannerCard({
           <>
             <img
               src={offer.background_image_url}
-              alt={offer.title}
+              alt={offer.title || 'Offer'}
               className="absolute inset-0 h-full w-full object-cover opacity-35"
               loading="lazy"
             />
@@ -424,7 +424,9 @@ function PromoBannerCard({
               <Tag size={8} />
               {offer.display_badge || 'DEAL'}
             </span>
-            <h3 className="text-[17px] font-black text-white leading-tight truncate">{offer.title}</h3>
+            {offer.title && (
+              <h3 className="text-[17px] font-black text-white leading-tight truncate">{offer.title}</h3>
+            )}
             {offer.description && (
               <p className="text-[11px] text-brand-text-dim mt-0.5 truncate">{offer.description}</p>
             )}

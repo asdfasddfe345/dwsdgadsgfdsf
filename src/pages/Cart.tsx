@@ -8,6 +8,7 @@ import { useSiteSettings } from '../hooks/useSiteSettings';
 import {
   getApplicableAutomaticOffers,
   getCartAddOnTotal,
+  getOfferBadgeLabel,
   getOfferCode,
   getOfferDiscountAmount,
   getOfferEligibilityError,
@@ -2208,7 +2209,7 @@ function CheckoutFlowModal({
                           className={`w-full rounded-xl border px-3 py-2.5 text-left transition-colors ${isSelected ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-brand-border bg-brand-surface/40 hover:border-brand-gold/30'}`}
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <span className={`text-[13px] font-bold ${isSelected ? 'text-emerald-400' : 'text-white'}`}>{result.offer.title}</span>
+                            <span className={`text-[13px] font-bold ${isSelected ? 'text-emerald-400' : 'text-white'}`}>{result.offer.title || getOfferBadgeLabel(result.offer)}</span>
                             <span className={`text-[11px] font-black ${isSelected ? 'text-emerald-300' : 'text-brand-gold'}`}>{valueText}</span>
                           </div>
                           <p className={`mt-0.5 text-[11px] ${isSelected ? 'text-emerald-300' : 'text-brand-text-muted'}`}>{getOfferRuleSummary(result.offer)}</p>

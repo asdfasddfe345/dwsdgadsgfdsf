@@ -249,7 +249,7 @@ export function getOfferRewardLabel(offer: Offer) {
       return rewardQuantity === 1 ? 'FREE ITEM' : `${rewardQuantity} FREE ITEMS`;
     }
     default:
-      return offer.title;
+      return offer.title || null;
   }
 }
 
@@ -264,7 +264,7 @@ export function getOfferDisplayDescription(offer: Offer) {
 
 export function getOfferRuleSummary(offer: Offer) {
   const triggerType = getOfferTriggerType(offer);
-  const rewardLabel = getOfferRewardLabel(offer) || offer.title;
+  const rewardLabel = getOfferRewardLabel(offer) || offer.title || '';
   const minimumOrder = Math.max(0, normalizeNumber(offer.min_order));
   const minimumOrderSuffix = minimumOrder > 0 ? ` on orders above ₹${formatNumber(minimumOrder)}` : '';
 
@@ -373,7 +373,7 @@ export function getOfferRewardItems(offer: Offer, context: OfferPricingContext):
           quantity: rewardQuantity * eligibleCycles,
           unit_price: normalizeNumber(item.price),
           offer_id: offer.id,
-          offer_title: offer.title,
+          offer_title: offer.title || '',
         };
       })
       .filter((item): item is OfferRewardItem => item !== null);
@@ -401,7 +401,7 @@ export function getOfferRewardItems(offer: Offer, context: OfferPricingContext):
     quantity: getRewardItemQuantity(offer) * eligibleCycles,
     unit_price: normalizeNumber(rewardItem.price),
     offer_id: offer.id,
-    offer_title: offer.title,
+    offer_title: offer.title || '',
   }];
 }
 

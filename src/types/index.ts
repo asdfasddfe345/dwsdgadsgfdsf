@@ -96,7 +96,7 @@ export type OfferRewardItemSource = 'specific_item' | 'qualifying_item';
 
 export interface Offer {
   id: string;
-  title: string;
+  title: string | null;
   description: string;
   code: string | null;
   display_badge?: string | null;
@@ -118,6 +118,7 @@ export interface Offer {
   reward_menu_item_id?: string | null;
   reward_item_source?: OfferRewardItemSource | null;
   reward_item_quantity?: number | null;
+  delivery_only?: boolean;
   valid_from: string;
   valid_until: string;
   is_active: boolean;

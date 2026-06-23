@@ -40,6 +40,7 @@ interface OfferForm {
   cta_target_category_id: string;
   cta_target_menu_item_id: string;
   is_cart_eligible: boolean;
+  delivery_only: boolean;
   offer_mode: OfferMode;
   trigger_type: OfferTriggerType;
   discount_type: OfferDiscountType;
@@ -271,6 +272,7 @@ function buildEmptyOffer(): OfferForm {
     cta_target_category_id: '',
     cta_target_menu_item_id: '',
     is_cart_eligible: true,
+    delivery_only: false,
     offer_mode: 'coupon',
     trigger_type: 'min_order',
     discount_type: 'percentage',
@@ -292,7 +294,7 @@ function buildEmptyOffer(): OfferForm {
 function mapOfferToForm(offer: Offer): OfferForm {
   return {
     id: offer.id,
-    title: offer.title,
+    title: offer.title || '',
     description: offer.description,
     code: offer.code || '',
     display_badge: offer.display_badge || '',
@@ -307,6 +309,7 @@ function mapOfferToForm(offer: Offer): OfferForm {
     cta_target_category_id: offer.cta_target_category_id || '',
     cta_target_menu_item_id: offer.cta_target_menu_item_id || '',
     is_cart_eligible: offer.is_cart_eligible !== false,
+    delivery_only: offer.delivery_only ?? false,
     offer_mode: getOfferMode(offer),
     trigger_type: getOfferTriggerType(offer),
     discount_type: offer.discount_type,
@@ -330,7 +333,7 @@ function buildPreviewOffer(offer: OfferForm): Offer {
 
   return {
     id: offer.id || 'preview-offer',
-    title: offer.title.trim() || 'Offer title',
+    title: offer.title?.trim() || null,
     description: offer.description,
     code: isCartEligible && offer.offer_mode === 'coupon' && offer.code.trim() ? offer.code.trim().toUpperCase() : null,
     display_badge: offer.display_badge.trim() || null,
@@ -341,6 +344,7 @@ function buildPreviewOffer(offer: OfferForm): Offer {
     cta_target_category_id: offer.cta_target_type === 'category' ? offer.cta_target_category_id.trim() || null : null,
     cta_target_menu_item_id: offer.cta_target_type === 'item' ? offer.cta_target_menu_item_id.trim() || null : null,
     is_cart_eligible: isCartEligible,
+    delivery_only: offer.delivery_only,
     offer_mode: isCartEligible ? offer.offer_mode : 'automatic',
     trigger_type: isCartEligible ? offer.trigger_type : 'min_order',
     discount_type: isCartEligible ? offer.discount_type : 'flat',
@@ -423,6 +427,7 @@ export default function AdminOffers() {
   const [rulesSchemaAvailable, setRulesSchemaAvailable] = useState<boolean | null>(null);
   const [freeItemSchemaAvailable, setFreeItemSchemaAvailable] = useState<boolean | null>(null);
   const [ctaTargetSchemaAvailable, setCtaTargetSchemaAvailable] = useState<boolean | null>(null);
+  const [deliveryOnlySchemaAvailable, setDeliveryOnlySchemaAvailable] = useState<boolean | null>(null);
   const [offerImageUploadAvailable, setOfferImageUploadAvailable] = useState<boolean | null>(null);
   const [uploadingBackgroundImage, setUploadingBackgroundImage] = useState(false);
   const backgroundImageInputRef = useRef<HTMLInputElement | null>(null);
@@ -564,11 +569,15 @@ export default function AdminOffers() {
         ['cta_target_type', 'cta_target_category_id', 'cta_target_menu_item_id']
           .every((column) => Object.prototype.hasOwnProperty.call(sampleOffer, column)),
       );
+      setDeliveryOnlySchemaAvailable(
+        Object.prototype.hasOwnProperty.call(sampleOffer, 'delivery_only'),
+      );
     } else {
       setDisplaySchemaAvailable(null);
       setRulesSchemaAvailable(null);
       setFreeItemSchemaAvailable(null);
       setCtaTargetSchemaAvailable(null);
+      setDeliveryOnlySchemaAvailable(null);
     }
 
     setLoading(false);
@@ -579,8 +588,7 @@ export default function AdminOffers() {
   }, [loadOffers]);
 
   async function saveOffer() {
-    if (!editing || !editing.title.trim()) {
-      showToast('Offer title is required', 'error');
+    if (!editing) {
       return;
     }
 
@@ -665,9 +673,12 @@ export default function AdminOffers() {
 
     const resolvedOfferMode: OfferMode = editing.is_cart_eligible ? editing.offer_mode : 'automatic';
     const resolvedTriggerType: OfferTriggerType = editing.is_cart_eligible ? editing.trigger_type : 'min_order';
+    const deliveryOnlyField = deliveryOnlySchemaAvailable !== false
+      ? { delivery_only: editing.delivery_only }
+      : {};
 
     const legacyPayload = {
-      title: editing.title.trim(),
+      title: editing.title.trim() || null,
       description: editing.description.trim(),
       code: resolvedOfferMode === 'coupon' ? editing.code.trim().toUpperCase() : null,
       discount_type: editing.is_cart_eligible ? editing.discount_type : 'flat',
@@ -678,6 +689,7 @@ export default function AdminOffers() {
       valid_from: validFrom,
       valid_until: validUntil,
       is_active: editing.is_active,
+      ...deliveryOnlyField,
     };
 
     const rulesPayload = {
@@ -1004,7 +1016,7 @@ export default function AdminOffers() {
                   <>
                     <img
                       src={slideBackgroundImage}
-                      alt={offer ? `${offer.title} offer background preview` : 'Offer background preview'}
+                      alt={offer ? `${offer.title || 'Offer'} background preview` : 'Offer background preview'}
                       loading="lazy"
                       width={1200}
                       height={600}
@@ -1020,7 +1032,14 @@ export default function AdminOffers() {
                 <div className="relative">
                   {offer ? (
                     <>
-                      <p className="mt-2 text-sm font-bold text-white">{offer.title}</p>
+                      {offer.delivery_only && (
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-sky-400">Delivery</p>
+                      )}
+                      {offer.title ? (
+                        <p className="mt-1 text-sm font-bold text-white">{offer.title}</p>
+                      ) : (
+                        <p className="mt-1 text-xs italic text-brand-text-dim">Image-only poster</p>
+                      )}
                       {getOfferDisplayDescription(offer) && (
                         <p className="mt-1 whitespace-pre-line text-xs text-brand-text-muted">
                           {getOfferDisplayDescription(offer)}
@@ -1103,7 +1122,7 @@ export default function AdminOffers() {
         <div className="bg-brand-surface rounded-xl border border-brand-border p-4 mb-6 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input
-              placeholder="Offer Title"
+              placeholder="Offer Title (optional — internal name)"
               value={editing.title}
               onChange={(e) => setEditing({ ...editing, title: e.target.value })}
               className="input-field"
@@ -1122,6 +1141,16 @@ export default function AdminOffers() {
                 className="rounded"
               />
               Affects cart pricing and coupons
+            </label>
+
+            <label className="flex items-center gap-2 rounded-xl border border-brand-border bg-brand-bg/30 px-3 text-sm text-brand-text-muted">
+              <input
+                type="checkbox"
+                checked={editing.delivery_only}
+                onChange={(e) => setEditing({ ...editing, delivery_only: e.target.checked })}
+                className="rounded"
+              />
+              Delivery Only Offer
             </label>
 
             <input
@@ -1565,8 +1594,15 @@ export default function AdminOffers() {
                       ? (getOfferMode(previewOffer) === 'automatic' ? 'Auto applied' : 'Coupon')
                       : 'Display only'}
                   </span>
+                  {previewOffer.delivery_only && (
+                    <span className="text-[11px] font-bold text-sky-400">Delivery only</span>
+                  )}
                 </div>
-                <p className="relative mt-2 text-sm font-bold text-white">{previewOffer.title}</p>
+                {previewOffer.title ? (
+                  <p className="relative mt-2 text-sm font-bold text-white">{previewOffer.title}</p>
+                ) : (
+                  <p className="relative mt-2 text-xs italic text-brand-text-dim">No title — image-only poster</p>
+                )}
                 {previewDescription && (
                   <p className="relative mt-1 whitespace-pre-line text-sm text-brand-text-muted">
                     {previewDescription}
@@ -1616,7 +1652,7 @@ export default function AdminOffers() {
                 {backgroundImageUrl ? (
                   <img
                     src={backgroundImageUrl}
-                    alt={`${offer.title} offer thumbnail`}
+                    alt={`${offer.title || 'Offer'} thumbnail`}
                     loading="lazy"
                     width={56}
                     height={56}
@@ -1633,7 +1669,7 @@ export default function AdminOffers() {
 
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-bold text-sm text-white">{offer.title}</h3>
+                    <h3 className="font-bold text-sm text-white">{offer.title || '(Untitled — poster)'}</h3>
                     <span className="bg-brand-surface-light text-brand-text-muted text-xs px-2 py-0.5 rounded font-mono">
                       {getOfferBadgeLabel(offer)}
                     </span>
@@ -1642,6 +1678,11 @@ export default function AdminOffers() {
                         ? (getOfferMode(offer) === 'automatic' ? 'Auto applied' : 'Coupon')
                         : 'Display only'}
                     </span>
+                    {offer.delivery_only && (
+                      <span className="rounded bg-sky-500/15 px-2 py-0.5 text-xs font-semibold text-sky-400">
+                        Delivery
+                      </span>
+                    )}
                     {carouselPosition >= 0 && (
                       <span className="rounded bg-brand-gold/15 px-2 py-0.5 text-xs font-semibold text-brand-gold">
                         Homepage #{carouselPosition + 1}
