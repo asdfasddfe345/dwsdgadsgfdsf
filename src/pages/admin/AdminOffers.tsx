@@ -445,7 +445,6 @@ export default function AdminOffers() {
   const [rulesSchemaAvailable, setRulesSchemaAvailable] = useState<boolean | null>(null);
   const [freeItemSchemaAvailable, setFreeItemSchemaAvailable] = useState<boolean | null>(null);
   const [ctaTargetSchemaAvailable, setCtaTargetSchemaAvailable] = useState<boolean | null>(null);
-  const [deliveryOnlySchemaAvailable, setDeliveryOnlySchemaAvailable] = useState<boolean | null>(null);
   const [orderTypeSchemaAvailable, setOrderTypeSchemaAvailable] = useState<boolean | null>(null);
   const [offerImageUploadAvailable, setOfferImageUploadAvailable] = useState<boolean | null>(null);
   const [uploadingBackgroundImage, setUploadingBackgroundImage] = useState(false);
@@ -588,10 +587,7 @@ export default function AdminOffers() {
         ['cta_target_type', 'cta_target_category_id', 'cta_target_menu_item_id']
           .every((column) => Object.prototype.hasOwnProperty.call(sampleOffer, column)),
       );
-      setDeliveryOnlySchemaAvailable(
-        Object.prototype.hasOwnProperty.call(sampleOffer, 'delivery_only'),
-      );
-      setOrderTypeSchemaAvailable(
+      setDeliveryOnlySchemaAvailable(false);      setOrderTypeSchemaAvailable(
         ['applies_to_delivery', 'applies_to_takeaway', 'applies_to_dine_in', 'show_on_offers_page', 'hide_text_overlay']
           .every((column) => Object.prototype.hasOwnProperty.call(sampleOffer, column)),
       );
@@ -697,9 +693,7 @@ export default function AdminOffers() {
 
     const resolvedOfferMode: OfferMode = editing.is_cart_eligible ? editing.offer_mode : 'automatic';
     const resolvedTriggerType: OfferTriggerType = editing.is_cart_eligible ? editing.trigger_type : 'min_order';
-    const deliveryOnlyField = deliveryOnlySchemaAvailable !== false && !orderTypeSchemaAvailable
-      ? { delivery_only: !editing.applies_to_takeaway && !editing.applies_to_dine_in && editing.applies_to_delivery }
-      : {};
+    const deliveryOnlyField = {};
     const orderTypeField = orderTypeSchemaAvailable !== false
       ? {
           applies_to_delivery: editing.applies_to_delivery,
