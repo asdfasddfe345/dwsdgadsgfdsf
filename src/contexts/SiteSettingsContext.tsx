@@ -35,6 +35,7 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
     let disposed = false;
 
     void (async () => {
@@ -42,18 +43,28 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
 
       if (disposed || !schemaReady) return;
 
+      // Realtime subscription — fires when admin updates site_settings
       channel = supabase
         .channel('site-settings')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'site_settings' }, () => {
           void refreshSettings();
         })
         .subscribe();
+
+      // Polling fallback (every 15 s) in case realtime is throttled or the
+      // anon client doesn't receive the event (e.g. RLS row-filter mismatch)
+      pollTimer = setInterval(() => {
+        void refreshSettings();
+      }, 15_000);
     })();
 
     return () => {
       disposed = true;
       if (channel) {
         void supabase.removeChannel(channel);
+      }
+      if (pollTimer) {
+        clearInterval(pollTimer);
       }
     };
   }, []);
