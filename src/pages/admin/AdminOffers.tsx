@@ -596,7 +596,6 @@ export default function AdminOffers() {
       setRulesSchemaAvailable(null);
       setFreeItemSchemaAvailable(null);
       setCtaTargetSchemaAvailable(null);
-      setDeliveryOnlySchemaAvailable(null);
       setOrderTypeSchemaAvailable(null);
     }
 
