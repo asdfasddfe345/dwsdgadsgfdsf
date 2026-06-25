@@ -18,9 +18,9 @@ function generateDrops(count: number): Drop[] {
       left: Math.random() * 100,
       delay: Math.random() * 4,
       duration: 0.6 + Math.random() * 0.8,
-      opacity: 0.35 + Math.random() * 0.45,
-      width: 1.5 + Math.random() * 1.5,
-      height: 15 + Math.random() * 25,
+      opacity: 0.15 + Math.random() * 0.2,
+      width: 0.5 + Math.random() * 0.7,
+      height: 12 + Math.random() * 18,
     });
   }
   return drops;
