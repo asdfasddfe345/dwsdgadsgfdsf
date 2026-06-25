@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, ChevronRight, Flame, Tag, Star, ArrowRight } from 'lucide-react';
+import { Search, ChevronRight, Flame, Star, ArrowRight } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import OfferCarousel from '../components/OfferCarousel';
 import { expireStalePendingOrders } from '../lib/inventorySchema';
@@ -191,11 +191,6 @@ export default function Home() {
     [allItems],
   );
 
-  const promoBannerOffer = useMemo(
-    () => offers.find((o) => o.background_image_url) || offers[1] || null,
-    [offers],
-  );
-
   function handleSearchSubmit(e: React.FormEvent) {
     e.preventDefault();
     navigate(searchQuery.trim() ? `/menu?q=${encodeURIComponent(searchQuery.trim())}` : '/menu');
@@ -302,19 +297,6 @@ export default function Home() {
         </ScrollReveal>
       )}
 
-      {/* ── Mid-page Promo Banner ── */}
-      {promoBannerOffer && (
-        <ScrollReveal>
-          <section className="px-4 pt-4 pb-1">
-            <PromoBannerCard
-              offer={promoBannerOffer}
-              categorySlugById={categorySlugById}
-              menuItemsById={menuItemsById}
-            />
-          </section>
-        </ScrollReveal>
-      )}
-
       {/* ── Category Rails ── */}
       {itemsByCategory.map((group, idx) => (
         <ScrollReveal key={group.category.id} delay={idx * 0.04}>
@@ -385,58 +367,6 @@ export default function Home() {
         )}
       </AnimatePresence>
     </div>
-  );
-}
-
-// ─── Promo Banner ─────────────────────────────────────────────────────────────
-
-function PromoBannerCard({
-  offer,
-  categorySlugById,
-  menuItemsById,
-}: {
-  offer: Offer;
-  categorySlugById: Record<string, string>;
-  menuItemsById: Record<string, { id: string; category_id: string }>;
-}) {
-  const href = getOfferCtaHref(offer, { categorySlugById, menuItemsById });
-
-  return (
-    <Link to={href}>
-      <div className="relative overflow-hidden rounded-[20px] border border-brand-gold/20 bg-brand-surface h-[116px] sm:h-[136px] hover:border-brand-gold/40 transition-colors">
-        {offer.background_image_url && (
-          <>
-            <img
-              src={offer.background_image_url}
-              alt={offer.title || 'Offer'}
-              className="absolute inset-0 h-full w-full object-cover opacity-35"
-              loading="lazy"
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-brand-bg/95 via-brand-bg/75 to-transparent" />
-          </>
-        )}
-        {!offer.background_image_url && (
-          <div className="absolute inset-0 bg-gradient-to-r from-brand-gold/15 via-brand-gold/8 to-transparent" />
-        )}
-        <div className="relative h-full flex items-center px-5 gap-4">
-          <div className="flex-1 min-w-0">
-            <span className="inline-flex items-center gap-1 rounded-md bg-brand-gold px-2 py-0.5 text-[9px] font-black text-brand-bg uppercase tracking-wide mb-1.5">
-              <Tag size={8} />
-              {offer.display_badge || 'DEAL'}
-            </span>
-            {offer.title && (
-              <h3 className="text-[17px] font-black text-white leading-tight truncate">{offer.title}</h3>
-            )}
-            {offer.description && (
-              <p className="text-[11px] text-brand-text-dim mt-0.5 truncate">{offer.description}</p>
-            )}
-          </div>
-          <div className="shrink-0 flex items-center gap-1 rounded-xl bg-brand-gold px-3.5 py-2 text-[12px] font-black text-brand-bg shadow-lg shadow-brand-gold/20">
-            Order Now <ArrowRight size={12} />
-          </div>
-        </div>
-      </div>
-    </Link>
   );
 }
 
