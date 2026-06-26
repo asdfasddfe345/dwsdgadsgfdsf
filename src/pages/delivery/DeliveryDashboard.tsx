@@ -691,9 +691,28 @@ export default function DeliveryDashboard() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full">Confirmed</span>
           )}
         </div>
-        <div className="flex items-center gap-1.5 mt-2">
-          <MapPin size={11} className="text-brand-text-dim flex-shrink-0" />
-          <p className="text-[11px] text-brand-text-dim truncate">{order.address}</p>
+        <div className="flex items-start gap-1.5 mt-2">
+          <MapPin size={11} className="text-sky-400 flex-shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            {(order.house_number || order.building_name) && (
+              <p className="text-[12px] font-semibold text-white leading-snug">
+                {[order.house_number, order.building_name].filter(Boolean).join(', ')}
+              </p>
+            )}
+            {order.floor_number && (
+              <p className="text-[11px] text-brand-text-dim leading-snug">{order.floor_number}</p>
+            )}
+            <p className="text-[11px] text-brand-text-muted leading-snug">{order.address}</p>
+            {order.pincode && (
+              <p className="text-[11px] text-brand-text-dim leading-snug">PIN: {order.pincode}</p>
+            )}
+            {order.landmark && (
+              <p className="text-[11px] text-brand-text-dim leading-snug">Near: {order.landmark}</p>
+            )}
+            {order.delivery_instructions && (
+              <p className="text-[11px] text-amber-400 italic leading-snug mt-0.5">"{order.delivery_instructions}"</p>
+            )}
+          </div>
         </div>
       </button>
     );
