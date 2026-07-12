@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Search, ChevronRight, Flame, Star, ArrowRight } from 'lucide-react';
 import { AnimatePresence, motion, useInView, type Variants } from 'framer-motion';
 import OfferCarousel from '../components/OfferCarousel';
-import HeroSection from '../components/HeroSection';
 import CategoryCarousel from '../components/CategoryCarousel';
 import { expireStalePendingOrders } from '../lib/inventorySchema';
 import { supabase } from '../lib/supabase';
@@ -211,7 +210,6 @@ export default function Home() {
     <div className="bg-brand-bg min-h-screen pb-24">
 
       {/* ── Hero ── */}
-      <HeroSection />
 
       {/* ── Sticky Search Bar ── */}
       <div className="sticky top-0 z-30 backdrop-blur-md border-b border-brand-border/50 px-4 py-2.5"
