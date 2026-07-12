@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, ChevronRight, Flame, Star, ArrowRight } from 'lucide-react';
-import { AnimatePresence } from 'motion/react';
+import { AnimatePresence, motion, useInView, type Variants } from 'framer-motion';
 import OfferCarousel from '../components/OfferCarousel';
+import HeroSection from '../components/HeroSection';
+import CategoryCarousel from '../components/CategoryCarousel';
+import TestimonialsSection from '../components/TestimonialsSection';
 import { expireStalePendingOrders } from '../lib/inventorySchema';
 import { supabase } from '../lib/supabase';
 import { sortCategoriesForMenu } from '../lib/categoryOrdering';
@@ -32,6 +35,11 @@ const seoFaqs = [
     answer: 'Yes. The website supports online ordering for dine-in and takeaway pickup.',
   },
 ];
+
+const sectionVariants: Variants = {
+  hidden: { opacity: 0, y: 28 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1] } },
+};
 
 export default function Home() {
   const initialSnapshot = useMemo(() => readHomeSnapshot(), []);
@@ -203,8 +211,13 @@ export default function Home() {
   return (
     <div className="bg-brand-bg min-h-screen pb-24">
 
+      {/* ── Hero ── */}
+      <HeroSection />
+
       {/* ── Sticky Search Bar ── */}
-      <div className="sticky top-0 z-30 bg-brand-bg/96 backdrop-blur-md border-b border-brand-border/50 px-4 py-2.5">
+      <div className="sticky top-0 z-30 backdrop-blur-md border-b border-brand-border/50 px-4 py-2.5"
+        style={{ background: 'rgba(13,5,1,0.92)' }}
+      >
         <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 max-w-2xl mx-auto">
           <div className="relative flex-1">
             <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-text-dim pointer-events-none" />
@@ -227,7 +240,10 @@ export default function Home() {
 
       {/* ── Offer Carousel ── */}
       {offers.length > 0 && (
-        <section className="px-4 pt-3 pb-1">
+        <section className="px-4 pt-4 pb-1">
+          <div className="flex items-center gap-2 mb-3">
+            <p className="section-label">Hot Deals</p>
+          </div>
           <OfferCarousel
             offers={offers}
             categorySlugById={categorySlugById}
@@ -237,47 +253,9 @@ export default function Home() {
         </section>
       )}
 
-      {/* ── Category Strip ── */}
+      {/* ── Category Carousel ── */}
       {categories.length > 0 && (
-        <ScrollReveal>
-          <section className="pt-4 pb-1">
-            <div className="flex items-center justify-between px-4 mb-3">
-              <h2 className="text-[15px] font-black text-white uppercase tracking-wide">Shop by Category</h2>
-              <Link to="/menu" className="flex items-center gap-0.5 text-[12px] font-bold text-brand-gold hover:text-brand-gold-soft transition-colors">
-                All <ChevronRight size={14} />
-              </Link>
-            </div>
-            <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-1">
-              {categories.map((cat) => (
-                <Link
-                  key={cat.id}
-                  to={`/menu?category=${cat.slug}`}
-                  className="flex-shrink-0 flex flex-col items-center gap-1.5"
-                  style={{ width: '64px' }}
-                >
-                  <div className="w-[58px] h-[58px] rounded-2xl overflow-hidden border border-brand-border bg-brand-surface hover:border-brand-gold/40 transition-all shrink-0">
-                    <img
-                      src={normalizeImageUrl(cat.image_url)}
-                      alt={cat.name}
-                      loading="lazy"
-                      decoding="async"
-                      width={58}
-                      height={58}
-                      onError={setImageFallback}
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-                  <span
-                    className="text-[10px] font-semibold text-brand-text-muted text-center leading-tight w-full overflow-hidden"
-                    style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
-                  >
-                    {cat.name}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </section>
-        </ScrollReveal>
+        <CategoryCarousel categories={categories} />
       )}
 
       {/* ── Best Sellers Rail ── */}
@@ -288,7 +266,7 @@ export default function Home() {
             badge="HOT"
             badgeColor="bg-orange-500"
             title={popularityContext.title.toUpperCase()}
-            subtitle="Most-ordered picks"
+            subtitle="Most-ordered picks right now"
             items={bestSellers}
             onImageClick={handleImageClick}
             onAdd={handleAdd}
@@ -296,6 +274,9 @@ export default function Home() {
           />
         </ScrollReveal>
       )}
+
+      {/* ── Testimonials ── */}
+      <TestimonialsSection />
 
       {/* ── Category Rails ── */}
       {itemsByCategory.map((group, idx) => (
@@ -328,7 +309,7 @@ export default function Home() {
       <ScrollReveal>
         <section className="px-4 pt-5 pb-2">
           <div className="rounded-[24px] border border-brand-border bg-brand-surface px-5 py-5">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-brand-gold mb-1">Quick Answers</p>
+            <p className="section-label mb-1">Quick Answers</p>
             <h2 className="text-[17px] font-black text-white mb-4">Common Questions</h2>
             <div className="grid gap-3 md:grid-cols-3">
               {seoFaqs.map((item) => (
@@ -394,9 +375,20 @@ function ProductRail({
   linkTo: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const isInView = useInView(sectionRef, { once: true, margin: '-40px' });
+
+  const railVariants: Variants = {
+    hidden: {},
+    visible: { transition: { staggerChildren: 0.05 } },
+  };
+  const railItemVariants: Variants = {
+    hidden: { opacity: 0, x: 20 },
+    visible: { opacity: 1, x: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } },
+  };
 
   return (
-    <section className="pt-5 pb-1">
+    <section ref={sectionRef} className="pt-6 pb-1">
       <div className="flex items-center justify-between px-4 mb-3">
         <div className="flex items-center gap-2 min-w-0">
           {icon}
@@ -420,20 +412,24 @@ function ProductRail({
         </Link>
       </div>
 
-      <div
+      <motion.div
         ref={scrollRef}
+        variants={railVariants}
+        initial="hidden"
+        animate={isInView ? 'visible' : 'hidden'}
         className="flex gap-2.5 overflow-x-auto scrollbar-hide px-4 snap-x snap-mandatory"
       >
         {items.map((item) => (
-          <div
+          <motion.div
             key={item.id}
+            variants={railItemVariants}
             className="flex-shrink-0 snap-start"
             style={{ width: 'clamp(108px, 32vw, 156px)' }}
           >
             <ProductCard item={item} onImageClick={onImageClick} onAdd={onAdd} />
-          </div>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
 
       <div className="px-4 mt-3">
         <Link
@@ -452,24 +448,44 @@ function ProductRail({
 function HomeLoadingShell() {
   return (
     <div className="bg-brand-bg min-h-screen pb-24">
+      {/* Hero skeleton */}
+      <div className="min-h-[420px] px-4 py-12 flex flex-col lg:flex-row items-center gap-8">
+        <div className="flex-1 flex flex-col gap-4">
+          <div className="h-5 w-40 rounded-full bg-brand-surface animate-pulse" />
+          <div className="space-y-2">
+            <div className="h-14 w-4/5 rounded-xl bg-brand-surface animate-pulse" />
+            <div className="h-14 w-3/5 rounded-xl bg-brand-surface animate-pulse" />
+          </div>
+          <div className="h-4 w-full max-w-xs rounded-full bg-brand-surface animate-pulse" />
+          <div className="flex gap-3">
+            <div className="h-11 w-32 rounded-xl bg-brand-surface animate-pulse" />
+            <div className="h-11 w-28 rounded-xl bg-brand-surface animate-pulse" />
+          </div>
+        </div>
+        <div className="w-64 h-64 rounded-3xl bg-brand-surface animate-pulse" />
+      </div>
+      {/* Search skeleton */}
       <div className="px-4 py-2.5 border-b border-brand-border/50">
         <div className="h-10 rounded-2xl bg-brand-surface animate-pulse" />
       </div>
-      <section className="px-4 pt-3 pb-1">
+      {/* Offers skeleton */}
+      <section className="px-4 pt-4 pb-1">
         <div className="h-[200px] animate-pulse rounded-[20px] bg-brand-surface" />
       </section>
-      <section className="pt-4 pb-1 px-4">
+      {/* Category skeleton */}
+      <section className="pt-6 pb-1 px-4">
         <div className="h-4 w-36 rounded-full bg-brand-surface mb-3 animate-pulse" />
         <div className="flex gap-3 overflow-hidden">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="flex-shrink-0 flex flex-col items-center gap-1.5" style={{ width: '64px' }}>
-              <div className="w-[58px] h-[58px] rounded-2xl bg-brand-surface animate-pulse" />
-              <div className="h-2.5 w-10 rounded-full bg-brand-surface animate-pulse" />
+            <div key={i} className="flex-shrink-0 flex flex-col items-center gap-1.5" style={{ width: '72px' }}>
+              <div className="w-[64px] h-[64px] rounded-2xl bg-brand-surface animate-pulse" />
+              <div className="h-2.5 w-12 rounded-full bg-brand-surface animate-pulse" />
             </div>
           ))}
         </div>
       </section>
-      <section className="pt-5 pb-1">
+      {/* Rail skeleton */}
+      <section className="pt-6 pb-1">
         <div className="px-4 mb-3 flex items-center justify-between">
           <div className="h-4 w-28 rounded-full bg-brand-surface animate-pulse" />
           <div className="h-3.5 w-12 rounded-full bg-brand-surface animate-pulse" />
