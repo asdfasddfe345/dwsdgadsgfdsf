@@ -11,16 +11,16 @@ interface CategoryCarouselProps {
 
 const containerVariants: Variants = {
   hidden: {},
-  visible: { transition: { staggerChildren: 0.06, delayChildren: 0.1 } },
+  visible: { transition: { staggerChildren: 0.07, delayChildren: 0.05 } },
 };
 
 const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 20, scale: 0.88 },
+  hidden: { opacity: 0, x: -32, scale: 0.88 },
   visible: {
     opacity: 1,
-    y: 0,
+    x: 0,
     scale: 1,
-    transition: { duration: 0.48, ease: [0.34, 1.56, 0.64, 1] },
+    transition: { duration: 0.45, ease: [0.34, 1.56, 0.64, 1] },
   },
 };
 
