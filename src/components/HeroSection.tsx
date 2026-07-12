@@ -3,8 +3,6 @@ import { Link } from 'react-router-dom';
 import { motion, useAnimation, useInView, type Variants } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 
-const HERO_IMG = 'https://images.pexels.com/photos/1099680/pexels-photo-1099680.jpeg?auto=compress&cs=tinysrgb&w=900';
-
 const TITLE_WORDS = ['THE', 'SUPREME', 'WAFFLE'];
 
 const containerVariants: Variants = {
@@ -30,17 +28,6 @@ const fadeUpVariants: Variants = {
     opacity: 1,
     y: 0,
     transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] },
-  },
-};
-
-const imageVariants: Variants = {
-  hidden: { opacity: 0, x: 80, scale: 0.88, filter: 'blur(12px)' },
-  visible: {
-    opacity: 1,
-    x: 0,
-    scale: 1,
-    filter: 'blur(0px)',
-    transition: { duration: 1.0, ease: [0.16, 1, 0.3, 1], delay: 0.3 },
   },
 };
 
@@ -165,74 +152,7 @@ export default function HeroSection() {
 
           </div>
 
-          {/* ── Right: Hero Image ── */}
-          <div className="flex-1 relative flex justify-center lg:justify-end items-center">
-            {/* Outer glow ring */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.7 }}
-              animate={isInView ? { opacity: 1, scale: 1 } : {}}
-              transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
-              className="absolute rounded-full choc-glow"
-              style={{
-                width: 'clamp(280px, 46vw, 500px)',
-                height: 'clamp(280px, 46vw, 500px)',
-                background: 'radial-gradient(circle, rgba(212,160,23,0.12) 0%, rgba(107,58,30,0.16) 40%, transparent 72%)',
-                filter: 'blur(24px)',
-              }}
-            />
 
-            {/* Rotating dashed ring */}
-            <motion.div
-              initial={{ opacity: 0, rotate: -30 }}
-              animate={isInView ? { opacity: 0.3, rotate: 0 } : {}}
-              transition={{ duration: 1.6, ease: [0.16, 1, 0.3, 1], delay: 0.4 }}
-              style={{
-                position: 'absolute',
-                width: 'clamp(300px, 48vw, 520px)',
-                height: 'clamp(300px, 48vw, 520px)',
-                borderRadius: '50%',
-                border: '1px dashed rgba(212,160,23,0.35)',
-              }}
-            />
-
-            {/* Main image */}
-            <motion.div
-              variants={imageVariants}
-              initial="hidden"
-              animate={controls}
-              className="relative z-10 animate-float"
-              style={{
-                width: 'clamp(240px, 40vw, 460px)',
-                height: 'clamp(240px, 40vw, 460px)',
-              }}
-            >
-              <div
-                className="w-full h-full rounded-[32px] overflow-hidden"
-                style={{
-                  boxShadow: '0 32px 80px rgba(0,0,0,0.65), 0 0 60px rgba(212,160,23,0.20), inset 0 1px 0 rgba(255,255,255,0.12)',
-                  border: '1px solid rgba(212,160,23,0.20)',
-                }}
-              >
-                <img
-                  src={HERO_IMG}
-                  alt="Supreme Waffle — premium Belgian waffle"
-                  loading="eager"
-                  decoding="async"
-                  className="w-full h-full object-cover"
-                  style={{ filter: 'saturate(1.15) brightness(0.92) contrast(1.05)' }}
-                />
-                {/* Gold shimmer overlay */}
-                <div
-                  className="absolute inset-0 pointer-events-none"
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(212,160,23,0.10) 0%, transparent 50%, rgba(107,58,30,0.12) 100%)',
-                  }}
-                />
-              </div>
-
-
-            </motion.div>
-          </div>
         </div>
       </div>
 
