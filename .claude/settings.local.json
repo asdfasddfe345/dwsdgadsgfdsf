@@ -14,5 +14,11 @@
       "WebFetch(domain:localhost)",
       "Bash(start http://localhost:5173/menu)"
     ]
+  },
+  "mcpServers": {
+    "21st-dev-magic": {
+      "command": "npx",
+      "args": ["-y", "@21st-dev/magic@latest", "API_KEY=\"21st_sk_f5f0c06b8e7fe002a4ce7de5f24cf12c0da3729eeefefe97b8fdd1375b7f4917\""]
+    }
   }
 }

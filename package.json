@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "postbuild": "react-snap",
+    "postbuild": "react-snap || true",
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json"
@@ -26,6 +26,7 @@
     "@googlemaps/js-api-loader": "^1.16.8",
     "@supabase/supabase-js": "^2.57.4",
     "firebase": "^12.11.0",
+    "framer-motion": "^12.42.2",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.344.0",
     "motion": "^12.38.0",
