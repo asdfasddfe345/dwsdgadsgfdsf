@@ -102,6 +102,8 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
   const [showResults, setShowResults]     = useState(false);
   const [noResults, setNoResults]         = useState(false);
   const [locating, setLocating]           = useState(false);
+  const [autoLocating, setAutoLocating]     = useState(!initialLat && !initialLng);
+  const pendingGpsRef = useRef<{ lat: number; lng: number } | null>(null);
 
   const [houseNumber, setHouseNumber]               = useState('');
   const [buildingName, setBuildingName]             = useState('');
@@ -175,8 +177,18 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
           }, 600);
         });
         setMapsLoaded(true);
-        lastGeocodedPosRef.current = { lat: initialLat ?? DEFAULT_LAT, lng: initialLng ?? DEFAULT_LNG };
-        reverseGeocode(initialLat ?? DEFAULT_LAT, initialLng ?? DEFAULT_LNG);
+        // If GPS was obtained before the map finished loading, fly there now
+        if (pendingGpsRef.current) {
+          const { lat, lng } = pendingGpsRef.current;
+          pendingGpsRef.current = null;
+          map.panTo({ lat, lng });
+          map.setZoom(FLY_ZOOM);
+          lastGeocodedPosRef.current = { lat, lng };
+          reverseGeocode(lat, lng);
+        } else {
+          lastGeocodedPosRef.current = { lat: initialLat ?? DEFAULT_LAT, lng: initialLng ?? DEFAULT_LNG };
+          reverseGeocode(initialLat ?? DEFAULT_LAT, initialLng ?? DEFAULT_LNG);
+        }
       }).catch(() => setMapsError(true));
     });
     return () => {
@@ -185,6 +197,36 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
       if (searchDebounceRef.current)  clearTimeout(searchDebounceRef.current);
       mapRef.current = null;
     };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-detect GPS on first open when no saved location exists
+  useEffect(() => {
+    if (initialLat || initialLng) return;
+    if (!navigator.geolocation) { setAutoLocating(false); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setDetectedGpsLat(lat);
+        setDetectedGpsLng(lng);
+        centerLatRef.current = lat;
+        centerLngRef.current = lng;
+        setAutoLocating(false);
+        if (mapRef.current) {
+          lastGeocodedPosRef.current = null;
+          mapRef.current.panTo({ lat, lng });
+          mapRef.current.setZoom(FLY_ZOOM);
+        } else {
+          // map not ready yet — store for when it loads
+          pendingGpsRef.current = { lat, lng };
+        }
+      },
+      () => {
+        // permission denied or error — just use default
+        setAutoLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 8000 },
+    );
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -478,10 +520,36 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
       <div className={`relative min-h-0 ${step === 'map' ? 'flex-1' : 'h-0 overflow-hidden'}`}>
         <div ref={mapContainerRef} className="absolute inset-0" style={{ background: '#0d0f14' }} />
 
-        {!mapsLoaded && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3" style={{ zIndex: 1 }}>
-            <Loader2 size={24} className="animate-spin text-brand-gold" />
-            <p className="text-brand-text-dim text-[13px]">Loading map…</p>
+        {(!mapsLoaded || autoLocating) && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4" style={{ zIndex: 10, background: 'rgba(13,15,20,0.92)', backdropFilter: 'blur(8px)' }}>
+            <div className="relative">
+              <div
+                className="w-16 h-16 rounded-2xl flex items-center justify-center"
+                style={{ background: 'rgba(216,178,78,0.15)', border: '1.5px solid rgba(216,178,78,0.3)' }}
+              >
+                <Navigation size={26} className="text-brand-gold" strokeWidth={1.8} />
+              </div>
+              <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center" style={{ background: '#0d0f14' }}>
+                <Loader2 size={14} className="animate-spin text-brand-gold" />
+              </span>
+            </div>
+            <div className="text-center space-y-1">
+              <p className="text-white text-[15px] font-bold">
+                {autoLocating ? 'Detecting your location…' : 'Loading map…'}
+              </p>
+              <p className="text-brand-text-dim text-[12.5px] leading-snug">
+                {autoLocating ? 'Allow location access for faster delivery' : 'Setting things up'}
+              </p>
+            </div>
+            {autoLocating && (
+              <button
+                type="button"
+                onClick={() => setAutoLocating(false)}
+                className="text-[12.5px] text-brand-text-dim underline underline-offset-2 mt-1"
+              >
+                Set manually instead
+              </button>
+            )}
           </div>
         )}
 
