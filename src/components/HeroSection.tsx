@@ -1,19 +1,9 @@
 import { useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useAnimation, useInView, type Variants } from 'framer-motion';
-import { ArrowRight, Star } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 const HERO_IMG = 'https://images.pexels.com/photos/1099680/pexels-photo-1099680.jpeg?auto=compress&cs=tinysrgb&w=900';
-
-const CATEGORY_CHIPS = [
-  { label: 'Waffles', emoji: '🧇' },
-  { label: 'Shakes', emoji: '🥤' },
-  { label: 'Burgers', emoji: '🍔' },
-  { label: 'Pizza', emoji: '🍕' },
-  { label: 'Momos', emoji: '🥟' },
-  { label: 'Fries', emoji: '🍟' },
-  { label: 'Desserts', emoji: '🍰' },
-];
 
 const TITLE_WORDS = ['THE', 'SUPREME', 'WAFFLE'];
 
@@ -51,30 +41,6 @@ const imageVariants: Variants = {
     scale: 1,
     filter: 'blur(0px)',
     transition: { duration: 1.0, ease: [0.16, 1, 0.3, 1], delay: 0.3 },
-  },
-};
-
-const chipContainerVariants: Variants = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.07, delayChildren: 0.9 } },
-};
-
-const chipVariants: Variants = {
-  hidden: { opacity: 0, y: 16, scale: 0.85 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { duration: 0.45, ease: [0.34, 1.56, 0.64, 1] },
-  },
-};
-
-const ratingVariants: Variants = {
-  hidden: { opacity: 0, scale: 0.8 },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    transition: { duration: 0.5, ease: [0.34, 1.56, 0.64, 1], delay: 0.75 },
   },
 };
 
@@ -196,53 +162,7 @@ export default function HeroSection() {
               </Link>
             </motion.div>
 
-            {/* Rating badge */}
-            <motion.div
-              variants={ratingVariants}
-              initial="hidden"
-              animate={controls}
-              className="flex items-center gap-3"
-            >
-              <div
-                className="flex items-center gap-1.5 rounded-full border border-brand-gold/25 px-3.5 py-1.5"
-                style={{ background: 'rgba(212,160,23,0.07)' }}
-              >
-                {[...Array(5)].map((_, i) => (
-                  <Star
-                    key={i}
-                    size={13}
-                    className="text-brand-gold fill-brand-gold"
-                    fill="currentColor"
-                  />
-                ))}
-                <span className="text-[13px] font-bold text-brand-gold ml-1">4.9</span>
-              </div>
-              <span className="text-[13px] text-brand-text-dim font-medium">
-                10,000+ happy customers
-              </span>
-            </motion.div>
 
-            {/* Category chips */}
-            <motion.div
-              variants={chipContainerVariants}
-              initial="hidden"
-              animate={controls}
-              className="flex flex-wrap gap-2 mt-7 justify-center lg:justify-start"
-            >
-              {CATEGORY_CHIPS.map((chip) => (
-                <motion.div key={chip.label} variants={chipVariants}>
-                  <Link
-                    to={`/menu?q=${chip.label.toLowerCase()}`}
-                    className="gloss-chip hover:border-brand-gold/30 hover:text-brand-gold transition-colors"
-                  >
-                    <span role="img" aria-label={chip.label} style={{ fontSize: 13 }}>
-                      {chip.emoji}
-                    </span>
-                    <span>{chip.label}</span>
-                  </Link>
-                </motion.div>
-              ))}
-            </motion.div>
           </div>
 
           {/* ── Right: Hero Image ── */}
@@ -310,35 +230,7 @@ export default function HeroSection() {
                 />
               </div>
 
-              {/* Floating badge — top left */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.6, y: 10 }}
-                animate={isInView ? { opacity: 1, scale: 1, y: 0 } : {}}
-                transition={{ duration: 0.55, ease: [0.34, 1.56, 0.64, 1], delay: 1.0 }}
-                className="absolute -top-4 -left-4 rounded-2xl border border-brand-gold/30 px-3.5 py-2.5 backdrop-blur-xl"
-                style={{
-                  background: 'rgba(13,5,1,0.82)',
-                  boxShadow: '0 8px 28px rgba(0,0,0,0.40)',
-                }}
-              >
-                <p className="text-[10px] font-bold uppercase tracking-widest text-brand-gold">Crafted Fresh</p>
-                <p className="text-[13px] font-bold text-brand-text">Belgian Waffles</p>
-              </motion.div>
 
-              {/* Floating badge — bottom right */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.6, y: -10 }}
-                animate={isInView ? { opacity: 1, scale: 1, y: 0 } : {}}
-                transition={{ duration: 0.55, ease: [0.34, 1.56, 0.64, 1], delay: 1.15 }}
-                className="absolute -bottom-4 -right-4 rounded-2xl border border-emerald-500/20 px-3.5 py-2.5 backdrop-blur-xl"
-                style={{
-                  background: 'rgba(13,5,1,0.82)',
-                  boxShadow: '0 8px 28px rgba(0,0,0,0.40)',
-                }}
-              >
-                <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Order In</p>
-                <p className="text-[13px] font-bold text-brand-text">30 Min Delivery</p>
-              </motion.div>
             </motion.div>
           </div>
         </div>

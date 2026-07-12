@@ -5,7 +5,6 @@ import { AnimatePresence, motion, useInView, type Variants } from 'framer-motion
 import OfferCarousel from '../components/OfferCarousel';
 import HeroSection from '../components/HeroSection';
 import CategoryCarousel from '../components/CategoryCarousel';
-import TestimonialsSection from '../components/TestimonialsSection';
 import { expireStalePendingOrders } from '../lib/inventorySchema';
 import { supabase } from '../lib/supabase';
 import { sortCategoriesForMenu } from '../lib/categoryOrdering';
@@ -275,8 +274,6 @@ export default function Home() {
         </ScrollReveal>
       )}
 
-      {/* ── Testimonials ── */}
-      <TestimonialsSection />
 
       {/* ── Category Rails ── */}
       {itemsByCategory.map((group, idx) => (
