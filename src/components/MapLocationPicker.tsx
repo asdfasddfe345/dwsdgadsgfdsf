@@ -10,8 +10,8 @@ import type { MapConfirmData } from '../types';
 
 const DEFAULT_LAT = 16.4724;
 const DEFAULT_LNG = 80.6516;
-const DEFAULT_ZOOM = 22;
-const FLY_ZOOM    = 22;
+const DEFAULT_ZOOM = 19;
+const FLY_ZOOM    = 19;
 const TILE_PREF_KEY = 'mapTilePreference';
 const DELIVERY_RADIUS_KM = 15;
 const RESTAURANT_LAT = 16.4724;
