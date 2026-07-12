@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useAnimation, useInView, type Variants } from 'framer-motion';
-import { Sparkles, ArrowRight, Star } from 'lucide-react';
+import { ArrowRight, Star } from 'lucide-react';
 
 const HERO_IMG = 'https://images.pexels.com/photos/1099680/pexels-photo-1099680.jpeg?auto=compress&cs=tinysrgb&w=900';
 
@@ -125,20 +125,6 @@ export default function HeroSection() {
 
           {/* ── Left: Text Content ── */}
           <div className="flex-1 flex flex-col items-center lg:items-start text-center lg:text-left">
-
-            {/* Eyebrow pill */}
-            <motion.div
-              variants={fadeUpVariants}
-              initial="hidden"
-              animate={controls}
-              className="inline-flex items-center gap-2 rounded-full border border-brand-gold/25 bg-brand-gold/8 px-4 py-1.5 mb-6 backdrop-blur-sm"
-              style={{ background: 'rgba(212,160,23,0.08)' }}
-            >
-              <Sparkles size={13} className="text-brand-gold" />
-              <span className="text-[12px] font-bold text-brand-gold tracking-widest uppercase">
-                Premium Belgian Craft
-              </span>
-            </motion.div>
 
             {/* Title: word-by-word stagger */}
             <motion.h1
