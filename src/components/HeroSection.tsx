@@ -44,7 +44,6 @@ export default function HeroSection() {
     <section
       ref={ref}
       className="relative overflow-hidden hero-grid"
-      style={{ minHeight: 'min(92vh, 720px)' }}
     >
       {/* Ambient glow blobs */}
       <div
