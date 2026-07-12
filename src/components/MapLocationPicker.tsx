@@ -8,7 +8,6 @@ import {
 import { DARK_MAP_STYLE, getGoogleMapsKey, getGoogleMapsLoader } from '../lib/googlemaps';
 import type { MapConfirmData } from '../types';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 const DEFAULT_LAT = 16.4724;
 const DEFAULT_LNG = 80.6516;
 const DEFAULT_ZOOM = 22;
@@ -21,7 +20,6 @@ const RESTAURANT_LNG = 80.6516;
 type TileMode = 'street' | 'satellite';
 type Step = 'map' | 'details';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 interface SearchSuggestion {
   label: string;
   sublabel: string;
@@ -35,7 +33,6 @@ interface Props {
   onClose: () => void;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -68,7 +65,6 @@ function parseGoogleComponents(components: google.maps.GeocoderAddressComponent[
   return { area, pincode };
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
 export default function MapLocationPicker({ initialLat, initialLng, onConfirm, onClose }: Props) {
   const mapContainerRef  = useRef<HTMLDivElement>(null);
   const searchWrapperRef = useRef<HTMLDivElement>(null);
@@ -80,13 +76,10 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
   const searchDebounceRef   = useRef<ReturnType<typeof setTimeout>>();
   const lastGeocodedPosRef  = useRef<{ lat: number; lng: number } | null>(null);
 
-  // ── Step ─────────────────────────────────────────────────────────────────
   const [step, setStep] = useState<Step>('map');
   const [mapsLoaded, setMapsLoaded] = useState(false);
   const [mapsError, setMapsError] = useState(false);
 
-  // ── Map state ────────────────────────────────────────────────────────────
-  // Refs (not state) — reading at confirm time / location bias; no renders needed
   const centerLatRef = useRef(initialLat ?? DEFAULT_LAT);
   const centerLngRef = useRef(initialLng ?? DEFAULT_LNG);
   const [pinManuallyMoved, setPinManuallyMoved] = useState(false);
@@ -97,14 +90,12 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
     return window.localStorage.getItem(TILE_PREF_KEY) === 'satellite' ? 'satellite' : 'street';
   });
 
-  // ── Reverse geocode state ─────────────────────────────────────────────────
   const [resolving, setResolving]             = useState(true);
   const [areaName, setAreaName]               = useState('');
   const [fullAddress, setFullAddress]         = useState('');
   const [detectedPincode, setDetectedPincode] = useState('');
   const [outOfRange, setOutOfRange]           = useState(false);
 
-  // ── Search state ──────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery]     = useState('');
   const [searchResults, setSearchResults] = useState<SearchSuggestion[]>([]);
   const [searching, setSearching]         = useState(false);
@@ -112,7 +103,6 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
   const [noResults, setNoResults]         = useState(false);
   const [locating, setLocating]           = useState(false);
 
-  // ── Details step ─────────────────────────────────────────────────────────
   const [houseNumber, setHouseNumber]               = useState('');
   const [buildingName, setBuildingName]             = useState('');
   const [floorNumber, setFloorNumber]               = useState('');
@@ -126,12 +116,10 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
   const finalPincode = detectedPincode || manualPincode.replace(/\D/g, '').slice(0, 6);
   const needsPincodeInput = step === 'details' && !resolving && !detectedPincode;
 
-  // ── Reverse geocode ───────────────────────────────────────────────────────
   const reverseGeocode = useCallback((lat: number, lng: number) => {
     if (!geocoderRef.current) return;
     setResolving(true);
     setOutOfRange(haversineKm(RESTAURANT_LAT, RESTAURANT_LNG, lat, lng) > DELIVERY_RADIUS_KM);
-
     geocoderRef.current.geocode(
       { location: { lat, lng }, region: 'IN' },
       (results, status) => {
@@ -150,19 +138,13 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
     );
   }, []);
 
-  // ── Google Maps init ──────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
-
     void getGoogleMapsKey().then((key) => {
       if (cancelled) return;
       if (!key) { setMapsError(true); return; }
-
-      void getGoogleMapsLoader(key)
-        .load()
-        .then(() => {
-          if (cancelled || !mapContainerRef.current) return;
-
+      void getGoogleMapsLoader(key).load().then(() => {
+        if (cancelled || !mapContainerRef.current) return;
         const map = new window.google.maps.Map(mapContainerRef.current, {
           center          : { lat: initialLat ?? DEFAULT_LAT, lng: initialLng ?? DEFAULT_LNG },
           zoom            : DEFAULT_ZOOM,
@@ -173,13 +155,10 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
           gestureHandling : 'greedy',
           clickableIcons  : false,
         });
-
         mapRef.current = map;
         geocoderRef.current = new window.google.maps.Geocoder();
         placesServiceRef.current = new window.google.maps.places.PlacesService(map);
-
         map.addListener('drag', () => setPinManuallyMoved(true));
-
         map.addListener('idle', () => {
           const c = map.getCenter();
           if (!c) return;
@@ -187,25 +166,19 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
           const lng = c.lng();
           centerLatRef.current = lat;
           centerLngRef.current = lng;
-
-          // Skip geocode if center hasn't moved (idle fired from resize, not user pan)
           const last = lastGeocodedPosRef.current;
           if (last && Math.abs(last.lat - lat) < 0.00005 && Math.abs(last.lng - lng) < 0.00005) return;
-
           if (resolveDebounceRef.current) clearTimeout(resolveDebounceRef.current);
           resolveDebounceRef.current = setTimeout(() => {
             lastGeocodedPosRef.current = { lat, lng };
             reverseGeocode(lat, lng);
           }, 600);
         });
-
         setMapsLoaded(true);
         lastGeocodedPosRef.current = { lat: initialLat ?? DEFAULT_LAT, lng: initialLng ?? DEFAULT_LNG };
         reverseGeocode(initialLat ?? DEFAULT_LAT, initialLng ?? DEFAULT_LNG);
-      })
-      .catch(() => setMapsError(true));
+      }).catch(() => setMapsError(true));
     });
-
     return () => {
       cancelled = true;
       if (resolveDebounceRef.current) clearTimeout(resolveDebounceRef.current);
@@ -214,7 +187,6 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Tile mode toggle ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!mapRef.current) return;
     if (tileMode === 'satellite') {
@@ -227,7 +199,6 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
     if (typeof window !== 'undefined') window.localStorage.setItem(TILE_PREF_KEY, tileMode);
   }, [tileMode]);
 
-  // ── Click-outside search ─────────────────────────────────────────────────
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target as Node)) {
@@ -238,15 +209,13 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // ── Fly to ───────────────────────────────────────────────────────────────
   function flyTo(lat: number, lng: number) {
     if (!mapRef.current) return;
-    lastGeocodedPosRef.current = null; // force geocode after pan
+    lastGeocodedPosRef.current = null;
     mapRef.current.panTo({ lat, lng });
     mapRef.current.setZoom(FLY_ZOOM);
   }
 
-  // ── GPS ──────────────────────────────────────────────────────────────────
   function detectLocation() {
     if (!navigator.geolocation) return;
     setLocating(true);
@@ -265,12 +234,10 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
     );
   }
 
-  // ── Search ───────────────────────────────────────────────────────────────
   function doSearch(q: string) {
     if (!mapsLoaded || q.trim().length < 2) { setSearchResults([]); setNoResults(false); return; }
     setSearching(true);
     setNoResults(false);
-
     const service = new window.google.maps.places.AutocompleteService();
     service.getPlacePredictions(
       {
@@ -282,8 +249,7 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
         setSearching(false);
         if (
           status !== window.google.maps.places.PlacesServiceStatus.OK ||
-          !predictions ||
-          predictions.length === 0
+          !predictions || predictions.length === 0
         ) {
           setSearchResults([]);
           setShowResults(false);
@@ -315,7 +281,6 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
     setSearchResults([]);
     setShowResults(false);
     setNoResults(false);
-
     if (!placesServiceRef.current) return;
     placesServiceRef.current.getDetails(
       { placeId: r.placeId, fields: ['geometry'] },
@@ -324,27 +289,22 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
           status === window.google.maps.places.PlacesServiceStatus.OK &&
           place?.geometry?.location
         ) {
-          const lat = place.geometry.location.lat();
-          const lng = place.geometry.location.lng();
-          flyTo(lat, lng);
+          flyTo(place.geometry.location.lat(), place.geometry.location.lng());
         }
       },
     );
   }
 
-  // ── Proceed to details ───────────────────────────────────────────────────
   function proceedToDetails() {
     setStep('details');
     setTimeout(() => detailInputRef.current?.focus(), 150);
   }
 
-  // ── Final confirm ─────────────────────────────────────────────────────────
   function handleConfirm() {
     let valid = true;
     if (!houseNumber.trim()) { setHouseError(true); valid = false; }
     if (finalPincode.length !== 6) { setPincodeError(true); valid = false; }
     if (!valid) return;
-
     const baseAddress = fullAddress || areaName || '';
     const parts = [
       houseNumber.trim(),
@@ -352,7 +312,6 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
       floorNumber.trim() ? `Floor ${floorNumber.trim()}` : '',
       baseAddress,
     ].filter(Boolean);
-
     onConfirm({
       address             : parts.join(', '),
       pincode             : finalPincode,
@@ -372,88 +331,119 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
 
   if (typeof document === 'undefined') return null;
 
-  // ── No API key fallback ───────────────────────────────────────────────────
   if (mapsError) {
     return createPortal(
-      <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-brand-surface px-6 gap-4">
-        <MapPin size={36} className="text-brand-gold" strokeWidth={1.8} />
-        <p className="text-white font-bold text-[16px] text-center">Map unavailable</p>
-        <p className="text-brand-text-dim text-[13px] text-center leading-relaxed">
-          The map service is not configured. Please enter your address manually.
-        </p>
+      <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-brand-surface px-8 gap-5">
+        <div className="w-16 h-16 rounded-2xl bg-brand-gold/10 flex items-center justify-center">
+          <MapPin size={28} className="text-brand-gold" strokeWidth={1.8} />
+        </div>
+        <div className="text-center space-y-2">
+          <p className="text-white font-bold text-[17px]">Map unavailable</p>
+          <p className="text-brand-text-dim text-[13px] leading-relaxed">
+            The map service is not configured. Please enter your address manually.
+          </p>
+        </div>
         <button onClick={onClose} className="btn-primary px-8 py-3 rounded-xl text-[14px] font-bold">Go back</button>
       </div>,
       document.body,
     );
   }
 
-  // ─── Render ───────────────────────────────────────────────────────────────
   return createPortal(
-    <div className="fixed inset-0 z-[200] flex flex-col" style={{ background: '#0f1117' }}>
+    <div className="fixed inset-0 z-[200] flex flex-col" style={{ background: '#0d0f14' }}>
 
-      {/* ── Step indicator ── */}
-      <div className="flex-shrink-0 bg-brand-surface border-b border-brand-border px-4 py-2 flex items-center gap-2">
-        <StepDot n={1} active={step === 'map'} done={step === 'details'} label="Pin location" />
-        <div className="flex-1 h-px bg-brand-border" />
-        <StepDot n={2} active={step === 'details'} done={false} label="Address details" />
-      </div>
+      {/* ── Top bar ── */}
+      <div
+        className="flex-shrink-0 flex items-center gap-3 px-4 pt-safe-top"
+        style={{
+          paddingTop: 'max(env(safe-area-inset-top, 0px), 12px)',
+          paddingBottom: 10,
+          background: 'rgba(13,15,20,0.96)',
+          backdropFilter: 'blur(14px)',
+          borderBottom: '1px solid rgba(255,255,255,0.07)',
+        }}
+      >
+        <button
+          onClick={step === 'details' ? () => setStep('map') : onClose}
+          className="w-9 h-9 flex items-center justify-center rounded-xl text-white transition-all active:scale-90"
+          style={{ background: 'rgba(255,255,255,0.07)' }}
+        >
+          <ArrowLeft size={18} strokeWidth={2.2} />
+        </button>
 
-      {/* ── Header ── */}
-      <div className="flex-shrink-0 bg-brand-surface border-b border-brand-border">
-        <div className="flex items-center gap-3 px-4 pt-3 pb-2">
-          <button
-            onClick={step === 'details' ? () => setStep('map') : onClose}
-            className="p-2 -ml-2 rounded-xl hover:bg-brand-surface-light transition-colors text-white"
-          >
-            <ArrowLeft size={20} strokeWidth={2.2} />
-          </button>
-          <h2 className="text-[15px] font-bold text-white flex-1">
-            {step === 'map' ? 'Set delivery location' : 'Add address details'}
-          </h2>
-          {step === 'map' && (
-            <button
-              onClick={detectLocation}
-              disabled={locating}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-gold/10 border border-brand-gold/20 rounded-lg text-brand-gold text-[12px] font-bold hover:bg-brand-gold/15 transition-all disabled:opacity-50"
-            >
-              {locating ? <Loader2 size={13} className="animate-spin" /> : <Navigation size={13} strokeWidth={2.2} />}
-              <span>My location</span>
-            </button>
-          )}
+        <div className="flex-1 min-w-0">
+          <p className="text-[15px] font-bold text-white leading-tight truncate">
+            {step === 'map' ? 'Set delivery location' : 'Address details'}
+          </p>
+          <p className="text-[11px] text-brand-text-dim leading-tight mt-0.5">
+            {step === 'map' ? 'Drag map to pin your exact location' : 'Help the rider find you faster'}
+          </p>
         </div>
 
-        {/* Search bar — map step only */}
-        {step === 'map' && (
-          <div ref={searchWrapperRef} className="relative px-4 pb-3">
-            <Search size={15} strokeWidth={2.2} className="absolute left-7 top-1/2 -translate-y-1/2 text-brand-text-dim pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search area, street, landmark..."
-              value={searchQuery}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              onFocus={() => searchResults.length > 0 && setShowResults(true)}
-              className="input-field pl-9 pr-9 text-[14px] w-full"
-            />
-            {searching
-              ? <Loader2 size={15} className="absolute right-7 top-1/2 -translate-y-1/2 text-brand-text-dim animate-spin pointer-events-none" />
-              : searchQuery && (
+        {/* Step pills */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <StepPill n={1} active={step === 'map'} done={step === 'details'} />
+          <div className="w-4 h-px bg-white/10" />
+          <StepPill n={2} active={step === 'details'} done={false} />
+        </div>
+      </div>
+
+      {/* ── Search bar (map step) ── */}
+      {step === 'map' && (
+        <div
+          className="flex-shrink-0 px-4 py-2.5"
+          style={{
+            background: 'rgba(13,15,20,0.96)',
+            backdropFilter: 'blur(14px)',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+          }}
+        >
+          <div ref={searchWrapperRef} className="relative">
+            <div
+              className="flex items-center gap-2.5 rounded-xl px-3.5 h-11"
+              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}
+            >
+              {searching
+                ? <Loader2 size={15} className="animate-spin text-brand-gold flex-shrink-0" />
+                : <Search size={15} strokeWidth={2.2} className="text-brand-text-dim flex-shrink-0" />
+              }
+              <input
+                type="text"
+                placeholder="Search area, street, landmark…"
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                onFocus={() => searchResults.length > 0 && setShowResults(true)}
+                className="flex-1 bg-transparent text-[13.5px] text-white placeholder:text-brand-text-dim outline-none min-w-0"
+              />
+              {searchQuery && (
                 <button
                   type="button"
                   onClick={() => { setSearchQuery(''); setSearchResults([]); setShowResults(false); setNoResults(false); }}
-                  className="absolute right-7 top-1/2 -translate-y-1/2 text-brand-text-dim hover:text-white transition-colors"
+                  className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-opacity hover:opacity-80"
+                  style={{ background: 'rgba(255,255,255,0.12)' }}
                 >
-                  <X size={15} strokeWidth={2.2} />
+                  <X size={11} strokeWidth={2.5} className="text-white" />
                 </button>
               )}
+            </div>
 
-            {(showResults && searchResults.length > 0) || noResults ? (
-              <div className="absolute left-4 right-4 top-full mt-0.5 bg-brand-surface border border-brand-border rounded-xl shadow-elevated z-10 max-h-64 overflow-y-auto">
+            {/* Search results dropdown */}
+            {((showResults && searchResults.length > 0) || noResults) && (
+              <div
+                className="absolute left-0 right-0 top-full mt-2 rounded-2xl overflow-hidden max-h-64 overflow-y-auto"
+                style={{
+                  background: 'rgba(20,23,30,0.98)',
+                  backdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+                  zIndex: 20,
+                }}
+              >
                 {noResults ? (
-                  <div className="px-4 py-4 text-center">
-                    <p className="text-[13px] text-brand-text-dim font-semibold">No results found</p>
-                    <p className="text-[11px] text-brand-text-dim/60 mt-1 leading-snug">
-                      Try a different spelling or use<br />
-                      <span className="text-brand-gold font-bold">Satellite</span> view to spot your building.
+                  <div className="px-4 py-5 text-center space-y-1">
+                    <p className="text-[13px] text-white font-semibold">No results found</p>
+                    <p className="text-[12px] text-brand-text-dim leading-snug">
+                      Try a different spelling or switch to Satellite view
                     </p>
                   </div>
                 ) : (
@@ -462,9 +452,15 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
                       key={i}
                       type="button"
                       onClick={() => selectSearchResult(r)}
-                      className="w-full text-left px-4 py-3 hover:bg-brand-surface-light transition-colors border-b border-brand-border last:border-0 flex items-start gap-3"
+                      className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors flex items-center gap-3"
+                      style={{ borderBottom: i < searchResults.length - 1 ? '1px solid rgba(255,255,255,0.06)' : undefined }}
                     >
-                      <MapPin size={14} strokeWidth={2.2} className="text-brand-gold flex-shrink-0 mt-1" />
+                      <div
+                        className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: 'rgba(216,178,78,0.12)' }}
+                      >
+                        <MapPin size={13} className="text-brand-gold" strokeWidth={2.2} />
+                      </div>
                       <div className="min-w-0">
                         <p className="text-[13px] text-white font-semibold leading-snug truncate">{r.label}</p>
                         {r.sublabel && <p className="text-[11px] text-brand-text-dim leading-snug truncate mt-0.5">{r.sublabel}</p>}
@@ -473,67 +469,115 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
                   ))
                 )}
               </div>
-            ) : null}
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* ── Map (always mounted, hidden on details step) ── */}
+      {/* ── Map canvas (always mounted, hidden in details) ── */}
       <div className={`relative min-h-0 ${step === 'map' ? 'flex-1' : 'h-0 overflow-hidden'}`}>
-        {/* Map container — Google Maps owns this div's children; keep it empty */}
-        <div ref={mapContainerRef} className="absolute inset-0" style={{ background: '#0f1117' }} />
+        <div ref={mapContainerRef} className="absolute inset-0" style={{ background: '#0d0f14' }} />
 
-        {/* Loading overlay — sibling so React never fights Google Maps for its children */}
         {!mapsLoaded && (
-          <div className="absolute inset-0 flex items-center justify-center gap-2 text-brand-text-dim text-[13px]" style={{ zIndex: 1 }}>
-            <Loader2 size={16} className="animate-spin text-brand-gold" />
-            <span>Loading map...</span>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3" style={{ zIndex: 1 }}>
+            <Loader2 size={24} className="animate-spin text-brand-gold" />
+            <p className="text-brand-text-dim text-[13px]">Loading map…</p>
           </div>
         )}
 
-        {/* Fixed centre pin */}
-        <div className="absolute pointer-events-none flex flex-col items-center" style={{ zIndex: 9999, left: '50%', top: '50%', transform: 'translate(-50%, -100%)' }}>
-          <div style={{ width: 46, height: 46, borderRadius: '50%', background: '#D8B24E', border: '3px solid #ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 28px rgba(216,178,78,0.65), 0 2px 8px rgba(0,0,0,0.4)' }}>
-            <MapPin size={22} color="#0f1117" strokeWidth={2.8} />
+        {/* Centre pin */}
+        <div
+          className="absolute pointer-events-none"
+          style={{ zIndex: 9999, left: '50%', top: '50%', transform: 'translate(-50%, -100%)' }}
+        >
+          <div className="flex flex-col items-center">
+            <div
+              style={{
+                width: 48, height: 48, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #D8B24E 0%, #f0d070 100%)',
+                border: '3px solid #fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 8px 32px rgba(216,178,78,0.7), 0 2px 10px rgba(0,0,0,0.5)',
+              }}
+            >
+              <MapPin size={22} color="#1a1400" strokeWidth={2.8} />
+            </div>
+            <div style={{ width: 3, height: 12, background: '#D8B24E', borderRadius: '0 0 3px 3px' }} />
+            <div style={{ width: 8, height: 3, borderRadius: '50%', background: 'rgba(0,0,0,0.3)' }} />
           </div>
-          <div style={{ width: 3, height: 14, background: '#D8B24E', borderRadius: '0 0 3px 3px' }} />
-          <div style={{ width: 10, height: 4, borderRadius: '50%', background: 'rgba(0,0,0,0.25)', marginTop: 1 }} />
         </div>
 
-        {/* Drag hint */}
+        {/* Drag hint pill */}
         <div className="absolute top-3 left-1/2 -translate-x-1/2 pointer-events-none" style={{ zIndex: 9999 }}>
-          <div className="rounded-full px-3.5 py-1.5 text-[11px] font-semibold text-white/90" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }}>
-            {pinManuallyMoved ? 'Pin moved ✓ — drag to fine-tune' : 'Move the pin to your exact entrance'}
+          <div
+            className="flex items-center gap-2 rounded-full px-4 py-2"
+            style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)' }}
+          >
+            {pinManuallyMoved
+              ? <CheckCircle2 size={12} className="text-emerald-400" strokeWidth={2.5} />
+              : <div className="w-2 h-2 rounded-full bg-brand-gold animate-pulse" />
+            }
+            <span className="text-[11px] font-semibold text-white/90">
+              {pinManuallyMoved ? 'Pin placed — drag to fine-tune' : 'Move the pin to your entrance'}
+            </span>
           </div>
         </div>
 
-        {/* Out-of-range warning */}
+        {/* Out of range */}
         {outOfRange && (
-          <div className="absolute bottom-44 left-4 right-4 pointer-events-none" style={{ zIndex: 9999 }}>
-            <div className="rounded-xl px-4 py-3 flex items-center gap-2" style={{ background: 'rgba(239,68,68,0.92)', backdropFilter: 'blur(8px)' }}>
-              <AlertCircle size={16} className="text-white flex-shrink-0" />
-              <p className="text-white text-[12px] font-bold">Sorry, this address is outside our delivery area.</p>
+          <div className="absolute bottom-48 left-4 right-4 pointer-events-none" style={{ zIndex: 9999 }}>
+            <div
+              className="rounded-2xl px-4 py-3.5 flex items-center gap-3"
+              style={{ background: 'rgba(220,38,38,0.9)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,100,100,0.3)' }}
+            >
+              <AlertCircle size={17} className="text-white flex-shrink-0" strokeWidth={2} />
+              <p className="text-white text-[12.5px] font-semibold">Outside our delivery area</p>
             </div>
           </div>
         )}
 
-        {/* Map / Satellite toggle */}
-        <button
-          type="button"
-          onClick={() => setTileMode((m) => (m === 'street' ? 'satellite' : 'street'))}
-          className="absolute top-3 right-3 flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-bold text-white shadow-elevated hover:scale-105 active:scale-95 transition-transform"
-          style={{ zIndex: 9999, background: 'rgba(15,17,23,0.85)', backdropFilter: 'blur(8px)', border: '1px solid rgba(216,178,78,0.35)' }}
-        >
-          <Layers size={14} strokeWidth={2.2} className="text-brand-gold" />
-          <span>{tileMode === 'street' ? 'Satellite' : 'Map'}</span>
-        </button>
+        {/* Map controls — top right */}
+        <div className="absolute top-3 right-3 flex flex-col gap-2" style={{ zIndex: 9999 }}>
+          {/* Satellite toggle */}
+          <button
+            type="button"
+            onClick={() => setTileMode((m) => (m === 'street' ? 'satellite' : 'street'))}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-bold text-white transition-all active:scale-95"
+            style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)' }}
+          >
+            <Layers size={13} strokeWidth={2.2} className="text-brand-gold" />
+            <span>{tileMode === 'street' ? 'Satellite' : 'Map'}</span>
+          </button>
 
-        {/* Zoom buttons */}
-        <div className="absolute bottom-36 right-3 flex flex-col gap-1" style={{ zIndex: 9999 }}>
-          <button type="button" onClick={() => mapRef.current?.setZoom((mapRef.current.getZoom() ?? DEFAULT_ZOOM) + 1)} className="w-9 h-9 flex items-center justify-center rounded-xl text-white hover:scale-105 active:scale-95 transition-transform" style={{ background: 'rgba(15,17,23,0.85)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.15)' }}>
+          {/* GPS */}
+          <button
+            type="button"
+            onClick={detectLocation}
+            disabled={locating}
+            className="w-9 h-9 flex items-center justify-center rounded-xl text-white transition-all active:scale-95 disabled:opacity-50"
+            style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)' }}
+            title="My location"
+          >
+            {locating ? <Loader2 size={15} className="animate-spin text-brand-gold" /> : <Navigation size={15} strokeWidth={2.2} className="text-brand-gold" />}
+          </button>
+        </div>
+
+        {/* Zoom controls — bottom right */}
+        <div className="absolute bottom-44 right-3 flex flex-col gap-1.5" style={{ zIndex: 9999 }}>
+          <button
+            type="button"
+            onClick={() => mapRef.current?.setZoom((mapRef.current.getZoom() ?? DEFAULT_ZOOM) + 1)}
+            className="w-9 h-9 flex items-center justify-center rounded-xl text-white transition-all active:scale-95"
+            style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)' }}
+          >
             <Plus size={16} strokeWidth={2.5} />
           </button>
-          <button type="button" onClick={() => mapRef.current?.setZoom((mapRef.current.getZoom() ?? DEFAULT_ZOOM) - 1)} className="w-9 h-9 flex items-center justify-center rounded-xl text-white hover:scale-105 active:scale-95 transition-transform" style={{ background: 'rgba(15,17,23,0.85)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.15)' }}>
+          <button
+            type="button"
+            onClick={() => mapRef.current?.setZoom((mapRef.current.getZoom() ?? DEFAULT_ZOOM) - 1)}
+            className="w-9 h-9 flex items-center justify-center rounded-xl text-white transition-all active:scale-95"
+            style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)' }}
+          >
             <Minus size={16} strokeWidth={2.5} />
           </button>
         </div>
@@ -541,23 +585,49 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
 
       {/* ── Map step bottom sheet ── */}
       {step === 'map' && (
-        <div className="flex-shrink-0 bg-brand-surface border-t border-brand-border px-4 pt-4 pb-6 space-y-3">
-          <div className="flex items-start gap-3 min-h-[44px]">
-            <div className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5" style={{ background: 'rgba(216,178,78,0.12)' }}>
-              <MapPin size={16} className="text-brand-gold" strokeWidth={2.2} />
+        <div
+          className="flex-shrink-0 px-4 pt-4 pb-8 space-y-4"
+          style={{
+            background: 'rgba(13,15,20,0.97)',
+            backdropFilter: 'blur(20px)',
+            borderTop: '1px solid rgba(255,255,255,0.08)',
+          }}
+        >
+          {/* Location pill */}
+          <div
+            className="flex items-start gap-3 rounded-2xl p-4"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+          >
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'rgba(216,178,78,0.15)' }}
+            >
+              {resolving
+                ? <Loader2 size={16} className="animate-spin text-brand-gold" />
+                : <MapPin size={16} className="text-brand-gold" strokeWidth={2.2} />
+              }
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 pt-0.5">
               {resolving ? (
-                <div className="flex items-center gap-2 text-brand-text-dim text-[13px]">
-                  <Loader2 size={13} className="animate-spin" />
-                  <span>Locating address...</span>
+                <div className="space-y-1.5">
+                  <div className="h-3.5 w-28 rounded-md bg-white/10 animate-pulse" />
+                  <div className="h-2.5 w-40 rounded-md bg-white/6 animate-pulse" />
                 </div>
               ) : (
                 <>
-                  <p className="text-[15px] font-bold text-white leading-tight">{areaName || 'Move map to set location'}</p>
-                  {fullAddress && <p className="text-[12px] text-brand-text-muted leading-snug mt-0.5 line-clamp-2">{fullAddress}</p>}
+                  <p className="text-[14.5px] font-bold text-white leading-tight">
+                    {areaName || 'Move the map to detect location'}
+                  </p>
+                  {fullAddress && (
+                    <p className="text-[12px] text-brand-text-dim leading-snug mt-1 line-clamp-2">{fullAddress}</p>
+                  )}
                   {detectedPincode && (
-                    <span className="inline-block mt-1 text-[11px] font-semibold text-brand-text-dim bg-brand-surface-light px-2 py-0.5 rounded-md">{detectedPincode}</span>
+                    <span
+                      className="inline-block mt-1.5 text-[11px] font-semibold text-brand-text-dim px-2 py-0.5 rounded-md"
+                      style={{ background: 'rgba(255,255,255,0.08)' }}
+                    >
+                      {detectedPincode}
+                    </span>
                   )}
                 </>
               )}
@@ -567,9 +637,9 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
           <button
             onClick={proceedToDetails}
             disabled={resolving || outOfRange || (!areaName && !fullAddress)}
-            className="btn-primary w-full rounded-xl py-3.5 text-[15px] font-black flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="btn-primary w-full rounded-2xl py-4 text-[15px] font-black flex items-center justify-center gap-2 disabled:opacity-35 disabled:cursor-not-allowed transition-all active:scale-[0.98]"
           >
-            <span>Add address details</span>
+            <span>Confirm & add details</span>
             <ChevronRight size={17} strokeWidth={2.5} />
           </button>
         </div>
@@ -577,140 +647,197 @@ export default function MapLocationPicker({ initialLat, initialLng, onConfirm, o
 
       {/* ── Details step ── */}
       {step === 'details' && (
-        <div className="flex-1 overflow-y-auto bg-brand-surface">
-          <div className="px-4 pt-4 pb-6 space-y-4">
-            {/* Area summary */}
-            <div className="flex items-center gap-3 bg-brand-surface-light rounded-xl px-4 py-3 border border-brand-border">
-              <MapPin size={15} className="text-brand-gold flex-shrink-0" strokeWidth={2.2} />
+        <div className="flex-1 overflow-y-auto" style={{ background: '#0d0f14' }}>
+          <div className="px-4 pt-4 pb-10 space-y-3">
+
+            {/* Location summary */}
+            <div
+              className="flex items-center gap-3 rounded-2xl px-4 py-3"
+              style={{ background: 'rgba(216,178,78,0.07)', border: '1px solid rgba(216,178,78,0.18)' }}
+            >
+              <MapPin size={14} className="text-brand-gold flex-shrink-0" strokeWidth={2.2} />
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-semibold text-white truncate">{areaName || fullAddress || 'Selected location'}</p>
-                {detectedPincode && <p className="text-[11px] text-brand-text-dim">{detectedPincode}</p>}
+                {detectedPincode && <p className="text-[11px] text-brand-gold/70 mt-0.5">{detectedPincode}</p>}
               </div>
-              <button onClick={() => setStep('map')} className="text-brand-gold text-[12px] font-bold hover:text-brand-gold/80 flex-shrink-0">Change</button>
+              <button
+                onClick={() => setStep('map')}
+                className="text-brand-gold text-[12px] font-bold flex-shrink-0 hover:opacity-80 transition-opacity"
+              >
+                Change
+              </button>
             </div>
 
-            {/* House / Flat (required) */}
-            <div className="space-y-1.5">
-              <label className="flex items-center gap-1.5 text-[12px] font-bold text-white">
-                <Hash size={12} strokeWidth={2.5} className="text-brand-gold" />
-                House / Flat no.
-                <span className="text-red-400 text-[13px] leading-none">*</span>
-              </label>
-              <input
-                ref={detailInputRef}
-                type="text"
-                placeholder="e.g. 4B, Door no. 23"
-                value={houseNumber}
-                onChange={(e) => { setHouseNumber(e.target.value); if (e.target.value.trim()) setHouseError(false); }}
-                className={`input-field text-[14px] ${houseError ? 'border-red-500/60 focus:border-red-500' : ''}`}
-              />
-              {houseError && <p className="text-[12px] text-red-400 font-semibold">Enter your house / flat number</p>}
-            </div>
+            {/* Form fields */}
+            <div
+              className="rounded-2xl overflow-hidden divide-y"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', divideColor: 'rgba(255,255,255,0.06)' }}
+            >
+              <FieldRow
+                icon={<Hash size={14} className="text-brand-gold" strokeWidth={2.5} />}
+                label="House / Flat no."
+                required
+                error={houseError}
+                errorMsg="Enter your house or flat number"
+              >
+                <input
+                  ref={detailInputRef}
+                  type="text"
+                  placeholder="e.g. 4B, Door no. 23"
+                  value={houseNumber}
+                  onChange={(e) => { setHouseNumber(e.target.value); if (e.target.value.trim()) setHouseError(false); }}
+                  className="detail-input"
+                />
+              </FieldRow>
 
-            {/* Building Name */}
-            <div className="space-y-1.5">
-              <label className="flex items-center gap-1.5 text-[12px] font-bold text-white">
-                <Building2 size={12} strokeWidth={2.5} className="text-brand-gold" />
-                Apartment / Building name
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Sri Sai Residency"
-                value={buildingName}
-                onChange={(e) => setBuildingName(e.target.value)}
-                className="input-field text-[14px]"
-              />
-            </div>
+              <FieldRow
+                icon={<Building2 size={14} className="text-brand-gold" strokeWidth={2.5} />}
+                label="Apartment / Building"
+              >
+                <input
+                  type="text"
+                  placeholder="e.g. Sri Sai Residency"
+                  value={buildingName}
+                  onChange={(e) => setBuildingName(e.target.value)}
+                  className="detail-input"
+                />
+              </FieldRow>
 
-            {/* Floor */}
-            <div className="space-y-1.5">
-              <label className="flex items-center gap-1.5 text-[12px] font-bold text-white">
-                <Home size={12} strokeWidth={2.5} className="text-brand-gold" />
-                Floor number
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                placeholder="e.g. 3"
-                value={floorNumber}
-                onChange={(e) => setFloorNumber(e.target.value)}
-                className="input-field text-[14px]"
-              />
-            </div>
+              <FieldRow
+                icon={<Home size={14} className="text-brand-gold" strokeWidth={2.5} />}
+                label="Floor number"
+              >
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="e.g. 3"
+                  value={floorNumber}
+                  onChange={(e) => setFloorNumber(e.target.value)}
+                  className="detail-input"
+                />
+              </FieldRow>
 
-            {/* Landmark */}
-            <div className="space-y-1.5">
-              <label className="flex items-center gap-1.5 text-[12px] font-bold text-white">
-                <Landmark size={12} strokeWidth={2.5} className="text-brand-gold" />
-                Landmark
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Near SBI ATM, opposite school"
-                value={landmark}
-                onChange={(e) => setLandmark(e.target.value)}
-                className="input-field text-[14px]"
-              />
-            </div>
+              <FieldRow
+                icon={<Landmark size={14} className="text-brand-gold" strokeWidth={2.5} />}
+                label="Landmark"
+              >
+                <input
+                  type="text"
+                  placeholder="e.g. Near SBI ATM, opposite school"
+                  value={landmark}
+                  onChange={(e) => setLandmark(e.target.value)}
+                  className="detail-input"
+                />
+              </FieldRow>
 
-            {/* Delivery instructions */}
-            <div className="space-y-1.5">
-              <label className="flex items-center gap-1.5 text-[12px] font-bold text-white">
-                <StickyNote size={12} strokeWidth={2.5} className="text-brand-gold" />
-                Delivery instructions
-                <span className="text-brand-text-dim font-normal">(optional)</span>
-              </label>
-              <textarea
-                rows={2}
-                placeholder="e.g. Ring bell twice, leave at door..."
-                value={deliveryInstructions}
-                onChange={(e) => setDeliveryInstructions(e.target.value)}
-                className="input-field text-[14px] resize-none leading-relaxed"
-              />
+              <FieldRow
+                icon={<StickyNote size={14} className="text-brand-gold" strokeWidth={2.5} />}
+                label="Delivery note"
+                hint="optional"
+              >
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Ring bell twice, leave at door…"
+                  value={deliveryInstructions}
+                  onChange={(e) => setDeliveryInstructions(e.target.value)}
+                  className="detail-input resize-none leading-relaxed"
+                />
+              </FieldRow>
             </div>
 
             {/* Pincode fallback */}
             {needsPincodeInput && (
-              <div className="space-y-1">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="Enter 6-digit pincode *"
-                  value={manualPincode}
-                  onChange={(e) => { setManualPincode(e.target.value.replace(/\D/g, '').slice(0, 6)); setPincodeError(false); }}
-                  className={`input-field text-[14px] ${pincodeError ? 'border-red-500/60 focus:border-red-500' : ''}`}
-                />
-                {pincodeError && <p className="text-[12px] text-red-400 font-semibold">Enter a valid 6-digit pincode</p>}
+              <div>
+                <div
+                  className="flex items-center gap-3 rounded-2xl px-4 py-3"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${pincodeError ? 'rgba(239,68,68,0.4)' : 'rgba(255,255,255,0.08)'}` }}
+                >
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Enter 6-digit pincode *"
+                    value={manualPincode}
+                    onChange={(e) => { setManualPincode(e.target.value.replace(/\D/g, '').slice(0, 6)); setPincodeError(false); }}
+                    className="flex-1 bg-transparent text-[14px] text-white placeholder:text-brand-text-dim outline-none"
+                  />
+                </div>
+                {pincodeError && <p className="text-[12px] text-red-400 font-semibold mt-1.5 px-1">Enter a valid 6-digit pincode</p>}
               </div>
             )}
 
-            {/* Confidence */}
+            {/* Confidence bar */}
             <ConfidenceBar score={confidenceScore} />
 
             {/* Confirm */}
             <button
               onClick={handleConfirm}
-              className="btn-primary w-full rounded-xl py-3.5 text-[15px] font-black flex items-center justify-center gap-2"
+              className="btn-primary w-full rounded-2xl py-4 text-[15px] font-black flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
             >
               <CheckCircle2 size={17} strokeWidth={2.5} />
-              <span>Confirm address</span>
+              <span>Save address</span>
             </button>
           </div>
         </div>
       )}
+
+      <style>{`
+        .detail-input {
+          width: 100%;
+          background: transparent;
+          font-size: 13.5px;
+          color: #fff;
+          outline: none;
+          padding: 0;
+        }
+        .detail-input::placeholder { color: rgba(255,255,255,0.28); }
+      `}</style>
     </div>,
     document.body,
   );
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-function StepDot({ n, active, done, label }: { n: number; active: boolean; done: boolean; label: string }) {
+// ── Sub-components ─────────────────────────────────────────────────────────────
+
+function StepPill({ n, active, done }: { n: number; active: boolean; done: boolean }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black transition-colors ${done ? 'bg-emerald-500 text-white' : active ? 'bg-brand-gold text-brand-bg' : 'bg-brand-border text-brand-text-dim'}`}>
-        {done ? <CheckCircle2 size={12} strokeWidth={3} /> : n}
+    <div
+      className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black transition-all duration-300"
+      style={{
+        background: done ? '#22c55e' : active ? '#D8B24E' : 'rgba(255,255,255,0.1)',
+        color: done || active ? '#0d0f14' : 'rgba(255,255,255,0.4)',
+      }}
+    >
+      {done ? <CheckCircle2 size={13} strokeWidth={3} /> : n}
+    </div>
+  );
+}
+
+function FieldRow({
+  icon, label, required, hint, error, errorMsg, children,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  required?: boolean;
+  hint?: string;
+  error?: boolean;
+  errorMsg?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="px-4 py-3.5 space-y-1.5" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+      <div className="flex items-center gap-1.5">
+        {icon}
+        <span className="text-[11.5px] font-bold text-brand-text-dim uppercase tracking-wide">{label}</span>
+        {required && <span className="text-red-400 text-[13px] leading-none">*</span>}
+        {hint && <span className="text-brand-text-dim/50 text-[11px] font-normal">({hint})</span>}
       </div>
-      <span className={`text-[11px] font-semibold ${active ? 'text-white' : 'text-brand-text-dim'}`}>{label}</span>
+      {children}
+      {error && errorMsg && (
+        <p className="text-[11.5px] text-red-400 font-semibold flex items-center gap-1">
+          <AlertCircle size={11} strokeWidth={2.5} />
+          {errorMsg}
+        </p>
+      )}
     </div>
   );
 }
@@ -718,18 +845,24 @@ function StepDot({ n, active, done, label }: { n: number; active: boolean; done:
 function ConfidenceBar({ score }: { score: number }) {
   const low = score < 60;
   return (
-    <div className="space-y-1.5">
+    <div
+      className="rounded-2xl px-4 py-3.5 space-y-2.5"
+      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+    >
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-bold text-brand-text-dim">Address confidence</span>
-        <span className={`text-[11px] font-bold ${low ? 'text-amber-400' : 'text-emerald-400'}`}>{score}%</span>
+        <span className="text-[12px] font-semibold text-brand-text-dim">Address accuracy</span>
+        <span className={`text-[12px] font-bold ${low ? 'text-amber-400' : 'text-emerald-400'}`}>{score}%</span>
       </div>
-      <div className="h-1.5 bg-brand-border rounded-full overflow-hidden">
-        <div className={`h-full rounded-full transition-all duration-300 ${low ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${score}%` }} />
+      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${low ? 'bg-amber-500' : 'bg-emerald-500'}`}
+          style={{ width: `${score}%` }}
+        />
       </div>
       {low && (
-        <p className="text-[11px] text-amber-400 flex items-center gap-1 leading-snug">
+        <p className="text-[11.5px] text-amber-400 flex items-center gap-1.5 leading-snug">
           <AlertCircle size={11} strokeWidth={2.5} />
-          Add more details to help the delivery partner find you
+          Add more details so the rider can find you easily
         </p>
       )}
     </div>
