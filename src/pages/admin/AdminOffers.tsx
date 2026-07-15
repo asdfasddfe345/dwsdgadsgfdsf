@@ -46,6 +46,7 @@ interface OfferForm {
   show_on_offers_page: boolean;
   hide_text_overlay: boolean;
   first_n_orders: string;
+  target_category_ids: string[];
   offer_mode: OfferMode;
   trigger_type: OfferTriggerType;
   discount_type: OfferDiscountType;
@@ -283,6 +284,7 @@ function buildEmptyOffer(): OfferForm {
     show_on_offers_page: true,
     hide_text_overlay: false,
     first_n_orders: '',
+    target_category_ids: [],
     trigger_type: 'min_order',
     discount_type: 'percentage',
     discount_value: '10',
@@ -324,6 +326,7 @@ function mapOfferToForm(offer: Offer): OfferForm {
     show_on_offers_page: offer.show_on_offers_page !== false,
     hide_text_overlay: offer.hide_text_overlay === true,
     first_n_orders: offer.first_n_orders ? String(offer.first_n_orders) : '',
+    target_category_ids: Array.isArray(offer.target_category_ids) ? offer.target_category_ids.filter(Boolean) : [],
     trigger_type: getOfferTriggerType(offer),
     discount_type: offer.discount_type,
     discount_value: String(offer.discount_value),
@@ -363,6 +366,7 @@ function buildPreviewOffer(offer: OfferForm): Offer {
     show_on_offers_page: offer.show_on_offers_page,
     hide_text_overlay: offer.hide_text_overlay,
     first_n_orders: offer.first_n_orders ? parseInt(offer.first_n_orders, 10) || null : null,
+    target_category_ids: offer.target_category_ids.filter(Boolean),
     offer_mode: isCartEligible ? offer.offer_mode : 'automatic',
     trigger_type: isCartEligible ? offer.trigger_type : 'min_order',
     discount_type: isCartEligible ? offer.discount_type : 'flat',
@@ -717,6 +721,7 @@ export default function AdminOffers() {
       is_active: editing.is_active,
       ...deliveryOnlyField,
       ...orderTypeField,
+      target_category_ids: editing.target_category_ids.filter(Boolean),
     };
 
     const rulesPayload = {
@@ -788,6 +793,7 @@ export default function AdminOffers() {
       first_n_orders: editing.first_n_orders.trim()
         ? Math.max(1, parseInt(editing.first_n_orders, 10) || 1)
         : null,
+      target_category_ids: editing.target_category_ids.filter(Boolean),
     };
 
     const savePayload = (
@@ -1231,6 +1237,58 @@ export default function AdminOffers() {
                 />
                 Hide all text on banner image (poster-only mode)
               </label>
+            </div>
+
+            <div className="sm:col-span-2 rounded-xl border border-brand-border bg-brand-bg/20 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-text-dim">Attach to categories</p>
+                {editing.target_category_ids.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setEditing({ ...editing, target_category_ids: [] })}
+                    className="text-[11px] font-semibold text-brand-gold hover:opacity-80"
+                  >
+                    Clear all
+                  </button>
+                )}
+              </div>
+              <p className="text-[11px] text-brand-text-dim">
+                Select one or more categories. When set, this offer only applies to items in those categories. Leave empty to apply to all.
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {categories.length === 0 ? (
+                  <span className="text-[12px] text-brand-text-dim italic">No categories available</span>
+                ) : (
+                  categories.map((category) => {
+                    const selected = editing.target_category_ids.includes(category.id);
+                    return (
+                      <button
+                        key={category.id}
+                        type="button"
+                        onClick={() => setEditing({
+                          ...editing,
+                          target_category_ids: selected
+                            ? editing.target_category_ids.filter((id) => id !== category.id)
+                            : [...editing.target_category_ids, category.id],
+                        })}
+                        className={`px-3 py-1.5 rounded-lg text-[12.5px] font-semibold transition-all active:scale-95 ${
+                          selected
+                            ? 'bg-brand-gold text-brand-bg border border-brand-gold'
+                            : 'bg-brand-bg/40 text-brand-text-muted border border-brand-border hover:border-brand-gold/40'
+                        }`}
+                      >
+                        {selected && <span className="mr-1">&#10003;</span>}
+                        {category.name}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+              {editing.target_category_ids.length > 0 && (
+                <p className="text-[11px] text-brand-gold font-semibold pt-1 border-t border-brand-border/50">
+                  {editing.target_category_ids.length} categor{editing.target_category_ids.length === 1 ? 'y' : 'ies'} selected
+                </p>
+              )}
             </div>
 
             <div className="space-y-1">
@@ -1815,6 +1873,17 @@ export default function AdminOffers() {
                         First {offer.first_n_orders === 1 ? 'order' : `${offer.first_n_orders} orders`}
                       </span>
                     )}
+                    {Array.isArray(offer.target_category_ids) && offer.target_category_ids.length > 0 && (() => {
+                      const names = offer.target_category_ids
+                        .map((cid) => categories.find((c) => c.id === cid)?.name)
+                        .filter(Boolean) as string[];
+                      if (names.length === 0) return null;
+                      return (
+                        <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-xs font-semibold text-emerald-400">
+                          {names.length <= 2 ? names.join(', ') : `${names.slice(0, 2).join(', ')} +${names.length - 2}`}
+                        </span>
+                      );
+                    })()}
                     {carouselPosition >= 0 && (
                       <span className="rounded bg-brand-gold/15 px-2 py-0.5 text-xs font-semibold text-brand-gold">
                         Homepage #{carouselPosition + 1}

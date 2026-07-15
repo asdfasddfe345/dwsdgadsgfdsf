@@ -124,6 +124,7 @@ export interface Offer {
   show_on_offers_page?: boolean;
   hide_text_overlay?: boolean;
   first_n_orders?: number | null;
+  target_category_ids?: string[] | null;
   valid_from: string;
   valid_until: string;
   is_active: boolean;
