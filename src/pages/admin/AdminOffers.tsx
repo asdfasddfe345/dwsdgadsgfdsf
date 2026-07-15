@@ -587,7 +587,7 @@ export default function AdminOffers() {
         ['cta_target_type', 'cta_target_category_id', 'cta_target_menu_item_id']
           .every((column) => Object.prototype.hasOwnProperty.call(sampleOffer, column)),
       );
-      setDeliveryOnlySchemaAvailable(false);      setOrderTypeSchemaAvailable(
+      setOrderTypeSchemaAvailable(
         ['applies_to_delivery', 'applies_to_takeaway', 'applies_to_dine_in', 'show_on_offers_page', 'hide_text_overlay']
           .every((column) => Object.prototype.hasOwnProperty.call(sampleOffer, column)),
       );
