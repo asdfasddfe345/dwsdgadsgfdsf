@@ -1,6 +1,7 @@
 import { createContext, useContext, useReducer, useEffect, type ReactNode } from 'react';
 import { useState } from 'react';
 import type { CartItem, MenuItem, SelectedCustomization } from '../types';
+import { trackAddToCart } from '../lib/metaPixel';
 
 interface CartState {
   items: CartItem[];
@@ -106,6 +107,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
       : `${menuItem.id}-${Date.now()}`;
 
     dispatch({ type: 'ADD_ITEM', payload: { id, menuItem, quantity, customizations } });
+
+    trackAddToCart({
+      content_ids: [menuItem.id],
+      content_name: menuItem.name,
+      content_type: 'product',
+      value: Number(menuItem.price) * quantity,
+      currency: 'INR',
+    });
+
     return id;
   };
 

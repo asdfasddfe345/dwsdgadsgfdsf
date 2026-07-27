@@ -16,6 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
 import { staggerContainer, staggerChild } from '../lib/animations';
 import { readGuestOrderSnapshot, updateGuestOrderSnapshot } from '../lib/guestOrderSnapshot';
+import { trackPurchase } from '../lib/metaPixel';
 
 const SESSION_KEYWORDS = ['session expired', 'sign in again', 'please sign in', 'authentication failed'];
 const ORDER_STATUS_VALUES: OrderStatus[] = [
@@ -205,6 +206,56 @@ export default function OrderSuccessPage() {
       isMounted = false;
     };
   }, [orderId, user]);
+
+  useEffect(() => {
+    if (!order || order.payment_status !== 'paid') return;
+
+    const orderUuid = order.id;
+    const orderId = order.order_id;
+    const finalTotal = Number(order.total);
+    if (!orderUuid || !orderId || !Number.isFinite(finalTotal)) return;
+
+    let cancelled = false;
+
+    async function firePurchase() {
+      let contentIds: string[] = [];
+      let numItems = 0;
+
+      try {
+        const { data } = await supabase
+          .from('order_items')
+          .select('menu_item_id, quantity')
+          .eq('order_id', orderUuid);
+
+        if (!cancelled && data && data.length > 0) {
+          contentIds = data.map((row) => String((row as { menu_item_id: string }).menu_item_id));
+          numItems = data.reduce(
+            (sum, row) => sum + Number((row as { quantity: number }).quantity || 0),
+            0,
+          );
+        }
+      } catch {
+        // Fall back to the order total only if item lookup fails.
+      }
+
+      if (cancelled) return;
+
+      trackPurchase({
+        content_ids: contentIds,
+        content_type: 'product',
+        num_items: numItems,
+        value: finalTotal,
+        currency: 'INR',
+        order_id: orderId,
+      });
+    }
+
+    void firePurchase();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [order]);
 
   useEffect(() => {
     if (!order) return;

@@ -42,6 +42,7 @@ import { useSiteSettings } from './hooks/useSiteSettings';
 import { readPendingOnlineOrder, clearPendingOnlineOrder } from './lib/pendingOnlineOrder';
 import { reconcileRazorpayPayment } from './lib/razorpay';
 import { updateGuestOrderSnapshot } from './lib/guestOrderSnapshot';
+import { initMetaPixel, trackPageView } from './lib/metaPixel';
 import type { Order } from './types';
 
 // Silently recovers a paid UPI order when the user returns to any page after
@@ -153,6 +154,16 @@ function CustomerLayout({ children }: { children: ReactNode }) {
 
 function ScrollToTop() {
   const { pathname, search, hash } = useLocation();
+  const lastTrackedPathRef = useRef<string | null>(null);
+
+  // Initialise the Meta Pixel once on mount and fire the first PageView.
+  useEffect(() => {
+    initMetaPixel();
+    if (lastTrackedPathRef.current !== pathname) {
+      lastTrackedPathRef.current = pathname;
+      trackPageView();
+    }
+  }, [pathname]);
 
   useEffect(() => {
     if (!('scrollRestoration' in window.history)) return;

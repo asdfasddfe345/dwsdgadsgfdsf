@@ -32,6 +32,7 @@ import { fetchCustomizationAvailability, itemHasAssignedCustomizations, type Cus
 import { createCounterOrder } from '../lib/counterOrder';
 import { suggestCartAddOns } from '../lib/cartSuggestions';
 import { calculateReviewRewardDiscount } from '../lib/itemReviews';
+import { trackInitiateCheckout } from '../lib/metaPixel';
 import type { DeliveryZone, MenuItem, Order, OrderType, PaymentMethod, Offer, PickupOption, ReviewRewardCoupon, SelectedCustomization, MapConfirmData } from '../types';
 import { useToast } from '../components/Toast';
 import { RAZORPAY_BRAND_IMAGE, buildRazorpayCallbackUrl, cancelRazorpayPayment, createRazorpayOrder, loadRazorpayScript, verifyRazorpayPayment } from '../lib/razorpay';
@@ -1029,6 +1030,13 @@ export default function CartPage() {
     if (submitting || !validateCheckoutAvailability()) {
       return;
     }
+
+    trackInitiateCheckout({
+      content_ids: items.map((item) => item.menu_item.id),
+      num_items: itemCount,
+      value: subtotal,
+      currency: 'INR',
+    });
 
     setCheckoutStep('service');
   }
