@@ -1,8 +1,54 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const projectRef = new URL(supabaseUrl).hostname.split('.')[0];
+function requireEnvironmentVariable(
+  variableName: string,
+  variableValue: string | undefined
+): string {
+  const cleanedValue = variableValue?.trim();
+
+  if (!cleanedValue) {
+    throw new Error(
+      `${variableName} is missing. Add it to Cloudflare Pages environment variables and redeploy the application.`
+    );
+  }
+
+  return cleanedValue;
+}
+
+function extractProjectReference(url: string): string {
+  let parsedUrl: URL;
+
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    throw new Error(
+      'VITE_SUPABASE_URL is invalid. Expected a URL such as https://your-project.supabase.co'
+    );
+  }
+
+  const projectReference = parsedUrl.hostname.split('.')[0];
+
+  if (!projectReference) {
+    throw new Error(
+      'Unable to extract the Supabase project reference from VITE_SUPABASE_URL.'
+    );
+  }
+
+  return projectReference;
+}
+
+const supabaseUrl = requireEnvironmentVariable(
+  'VITE_SUPABASE_URL',
+  import.meta.env.VITE_SUPABASE_URL
+);
+
+const supabaseAnonKey = requireEnvironmentVariable(
+  'VITE_SUPABASE_ANON_KEY',
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
+
+const projectRef = extractProjectReference(supabaseUrl);
+
 const legacyStorageKey = `sb-${projectRef}-auth-token`;
 const customerStorageKey = `${legacyStorageKey}-customer`;
 const staffStorageKey = `${legacyStorageKey}-staff`;
@@ -27,9 +73,12 @@ function getClientRegistry(): ClientRegistry {
   return window.__supremeWaffleSupabaseClients__;
 }
 
-function createScopedSupabaseClient(storageKey: string) {
+function createScopedSupabaseClient(
+  storageKey: string
+): SupabaseClient {
   const registry = getClientRegistry();
   const existingClient = registry[storageKey];
+
   if (existingClient) {
     return existingClient;
   }
@@ -37,6 +86,9 @@ function createScopedSupabaseClient(storageKey: string) {
   const client = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       storageKey,
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
     },
   });
 
@@ -47,34 +99,55 @@ function createScopedSupabaseClient(storageKey: string) {
   return client;
 }
 
-function getBrowserPathname() {
-  if (typeof window === 'undefined') return '/';
+function getBrowserPathname(): string {
+  if (typeof window === 'undefined') {
+    return '/';
+  }
+
   return window.location.pathname;
 }
 
-export function isStaffPath(pathname: string) {
-  return pathname.startsWith('/admin') || pathname.startsWith('/chef') || pathname.startsWith('/delivery');
+export function isStaffPath(pathname: string): boolean {
+  return (
+    pathname.startsWith('/admin') ||
+    pathname.startsWith('/chef') ||
+    pathname.startsWith('/delivery')
+  );
 }
 
-export const customerSupabase = createScopedSupabaseClient(customerStorageKey);
-export const staffSupabase = createScopedSupabaseClient(staffStorageKey);
+export const customerSupabase =
+  createScopedSupabaseClient(customerStorageKey);
 
-export function getSupabaseClientForPath(pathname = getBrowserPathname()): SupabaseClient {
-  return isStaffPath(pathname) ? staffSupabase : customerSupabase;
+export const staffSupabase =
+  createScopedSupabaseClient(staffStorageKey);
+
+export function getSupabaseClientForPath(
+  pathname: string = getBrowserPathname()
+): SupabaseClient {
+  return isStaffPath(pathname)
+    ? staffSupabase
+    : customerSupabase;
 }
 
 if (typeof window !== 'undefined') {
   try {
     window.localStorage.removeItem(legacyStorageKey);
   } catch {
-    // Ignore localStorage access issues in restricted browsers.
+    // Ignore browsers where localStorage access is restricted.
   }
 }
 
 export const supabase = new Proxy(customerSupabase, {
-  get(_target, prop) {
-    const client = getSupabaseClientForPath();
-    const value = Reflect.get(client, prop, client);
-    return typeof value === 'function' ? value.bind(client) : value;
+  get(_target, property) {
+    const selectedClient = getSupabaseClientForPath();
+    const value = Reflect.get(
+      selectedClient,
+      property,
+      selectedClient
+    );
+
+    return typeof value === 'function'
+      ? value.bind(selectedClient)
+      : value;
   },
 }) as typeof customerSupabase;
