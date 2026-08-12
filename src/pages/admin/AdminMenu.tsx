@@ -4,6 +4,7 @@ import { useToast } from '../../components/Toast';
 import CustomizationAssignmentsManager from '../../components/admin/CustomizationAssignmentsManager';
 import { detectDietarySchemaSupport, detectInventorySchemaSupport } from '../../lib/inventorySchema';
 import { getMenuItemDietaryBadges } from '../../lib/menuItemDietary';
+import { getMenuItemDiscount } from '../../lib/menuItems';
 import { supabase } from '../../lib/supabase';
 import type { Category, MenuItem } from '../../types';
 
@@ -12,6 +13,7 @@ interface ItemForm {
   name: string;
   description: string;
   price: string;
+  original_price: string;
   category_id: string;
   image_url: string;
   prep_time: string;
@@ -34,6 +36,7 @@ const emptyItem: ItemForm = {
   name: '',
   description: '',
   price: '',
+  original_price: '',
   category_id: '',
   image_url: '',
   prep_time: '10',
@@ -214,6 +217,7 @@ function toItemForm(item: MenuItem): ItemForm {
     name: normalizeItemName(item.name),
     description: item.description,
     price: String(item.price),
+    original_price: item.original_price == null ? '' : String(item.original_price),
     category_id: item.category_id,
     image_url: normalizeImageUrl(item.image_url),
     prep_time: String(item.prep_time),
@@ -453,11 +457,19 @@ export default function AdminMenu() {
       return;
     }
 
+    const price = parseFloat(editing.price) || 0;
+    const originalPrice = editing.original_price.trim() ? parseFloat(editing.original_price) : NaN;
+    if (editing.original_price.trim() && !(originalPrice > price)) {
+      showToast('Original price must be higher than the discounted price', 'error');
+      return;
+    }
+
     const nextAvailability = computeEffectiveAvailability(editing.manual_availability, editing.track_inventory, availableQuantity);
     const basePayload = {
       name: normalizeItemName(editing.name),
       description: editing.description,
-      price: parseFloat(editing.price) || 0,
+      price,
+      original_price: Number.isFinite(originalPrice) ? originalPrice : null,
       category_id: editing.category_id,
       image_url: normalizeImageUrl(editing.image_url),
       prep_time: parseInt(editing.prep_time, 10) || 10,
@@ -955,9 +967,23 @@ export default function AdminMenu() {
               <select value={editing.category_id} onChange={(e) => setEditing({ ...editing, category_id: e.target.value })} className="input-field">
                 {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
-              <input placeholder="Price" type="number" value={editing.price} onChange={(e) => setEditing({ ...editing, price: e.target.value })} className="input-field" />
+              <input placeholder="Price customer pays (e.g. 89)" type="number" value={editing.price} onChange={(e) => setEditing({ ...editing, price: e.target.value })} className="input-field" />
+              <input placeholder="Original price, struck out (e.g. 99)" type="number" value={editing.original_price} onChange={(e) => setEditing({ ...editing, original_price: e.target.value })} className="input-field" />
               <input placeholder="Prep Time (min)" type="number" value={editing.prep_time} onChange={(e) => setEditing({ ...editing, prep_time: e.target.value })} className="input-field" />
             </div>
+
+            {(() => {
+              const preview = getMenuItemDiscount(parseFloat(editing.price) || 0, parseFloat(editing.original_price));
+              return preview ? (
+                <p className="text-xs text-brand-text-muted">
+                  Card shows <span className="font-bold text-brand-gold">₹{parseFloat(editing.price) || 0}</span>{' '}
+                  <span className="line-through">₹{preview.original}</span>{' '}
+                  <span className="font-bold text-emerald-400">{preview.percent}% OFF</span>
+                </p>
+              ) : editing.original_price.trim() ? (
+                <p className="text-xs text-amber-300">Original price must be higher than the price customer pays.</p>
+              ) : null;
+            })()}
 
             <input placeholder="Image URL" value={editing.image_url} onChange={(e) => setEditing({ ...editing, image_url: e.target.value })} className="input-field" />
             <textarea placeholder="Description" value={editing.description} onChange={(e) => setEditing({ ...editing, description: e.target.value })} className="input-field resize-none" rows={2} />

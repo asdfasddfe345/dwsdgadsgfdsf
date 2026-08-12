@@ -5,6 +5,7 @@ import type { MenuItem } from '../types';
 import { useCart } from '../contexts/CartContext';
 import { FALLBACK_IMAGE_SRC, normalizeImageUrl } from '../lib/images';
 import { getMenuItemDietaryBadges } from '../lib/menuItemDietary';
+import { getMenuItemDiscount } from '../lib/menuItems';
 
 interface ProductCardProps {
   item: MenuItem;
@@ -16,6 +17,7 @@ export default function ProductCard({ item, onImageClick, onAdd }: ProductCardPr
   const { items, updateQuantity, removeItem } = useCart();
   const [imageSrc, setImageSrc] = useState(normalizeImageUrl(item.image_url));
   const dietaryBadges = getMenuItemDietaryBadges(item);
+  const discount = getMenuItemDiscount(item.price, item.original_price);
 
   const cartItems = items.filter((ci) => ci.menu_item.id === item.id);
   const totalQty = cartItems.reduce((sum, ci) => sum + ci.quantity, 0);
@@ -154,9 +156,21 @@ export default function ProductCard({ item, onImageClick, onAdd }: ProductCardPr
         >
           {item.name}
         </p>
-        <p className="mt-1 text-[14px] font-extrabold text-brand-gold tracking-tight">
-          &#8377;{item.price}
-        </p>
+        <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+          <p className="text-[14px] font-extrabold text-brand-gold tracking-tight">
+            &#8377;{item.price}
+          </p>
+          {discount && (
+            <>
+              <span className="text-[12px] font-semibold text-brand-text-dim line-through">
+                &#8377;{discount.original}
+              </span>
+              <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-400">
+                {discount.percent}% OFF
+              </span>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

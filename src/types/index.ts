@@ -12,6 +12,7 @@ export interface MenuItem {
   name: string;
   description: string;
   price: number;
+  original_price?: number | null;
   image_url: string;
   prep_time: number;
   rating: number;
