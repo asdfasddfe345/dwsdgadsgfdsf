@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  ShoppingCart, Search, Plus, Minus, Trash2, X, Check, ChevronRight,
+  ShoppingCart, Search, Plus, Minus, Trash2, X, ChevronRight,
   User, Phone, Mail, Store, Utensils, Loader2, ArrowLeft, Zap,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { createCounterOrder } from '../../lib/counterOrder';
+import { createCounterOrder, TAKEAWAY_CHARGE } from '../../lib/counterOrder';
 import { useToast } from '../../components/Toast';
 import type { Category, MenuItem, PickupOption } from '../../types';
 
@@ -78,6 +78,8 @@ export default function ChefNewOrder({ onClose, onOrderCreated }: Props) {
 
   const cartCount = cart.reduce((s, c) => s + c.quantity, 0);
   const subtotal = roundCurrency(cart.reduce((s, c) => s + Number(c.menu_item.price) * c.quantity, 0));
+  const takeawayFee = pickupOption === 'takeaway' ? TAKEAWAY_CHARGE : 0;
+  const total = roundCurrency(subtotal + takeawayFee);
 
   const filteredItems = search.trim()
     ? menuItems.filter((i) => i.name.toLowerCase().includes(search.trim().toLowerCase()))
@@ -116,7 +118,7 @@ export default function ChefNewOrder({ onClose, onOrderCreated }: Props) {
         deliveryFee: 0,
         subtotal,
         discount: 0,
-        total: subtotal,
+        total,
         paymentMethod: 'cod',
         items: cart.map((c) => ({
           menu_item_id: c.menu_item.id,
@@ -378,6 +380,7 @@ export default function ChefNewOrder({ onClose, onOrderCreated }: Props) {
               >
                 <Store size={16} />
                 Takeaway
+                <span className="ml-auto text-[11px] font-semibold text-brand-text-dim">+&#8377;{TAKEAWAY_CHARGE}</span>
               </button>
             </div>
           </div>
@@ -451,9 +454,17 @@ export default function ChefNewOrder({ onClose, onOrderCreated }: Props) {
                 </div>
               </div>
             ))}
-            <div className="border-t border-brand-border mt-3 pt-3 flex items-center justify-between">
-              <span className="text-[13px] font-bold text-white">Total</span>
-              <span className="text-brand-gold font-black text-lg tabular-nums">&#8377;{subtotal}</span>
+            <div className="border-t border-brand-border mt-3 pt-3 space-y-1.5">
+              {takeawayFee > 0 && (
+                <div className="flex items-center justify-between text-[13px] text-brand-text-muted">
+                  <span>Takeaway charge</span>
+                  <span className="tabular-nums">&#8377;{takeawayFee}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] font-bold text-white">Total</span>
+                <span className="text-brand-gold font-black text-lg tabular-nums">&#8377;{total}</span>
+              </div>
             </div>
           </div>
 
@@ -471,7 +482,7 @@ export default function ChefNewOrder({ onClose, onOrderCreated }: Props) {
             ) : (
               <>
                 <Zap size={18} />
-                Place Order · &#8377;{subtotal}
+                Place Order · &#8377;{total}
               </>
             )}
           </button>

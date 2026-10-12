@@ -73,13 +73,10 @@ export default function CategoryCarousel({ categories }: CategoryCarouselProps) 
               <Link
                 to={`/menu?category=${cat.slug}`}
                 className="group flex flex-col items-center gap-2"
-                style={{ width: '72px' }}
+                style={{ width: '72px', perspective: '400px' }}
               >
                 <div
-                  className={`relative w-[64px] h-[64px] rounded-2xl overflow-hidden border border-brand-border bg-gradient-to-br ${gradient} group-hover:border-brand-gold/40 transition-all duration-300 group-hover:scale-105 group-hover:shadow-glow-gold`}
-                  style={{
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
-                  }}
+                  className={`relative w-[64px] h-[64px] rounded-2xl overflow-hidden border border-brand-border bg-gradient-to-br ${gradient} group-hover:border-brand-gold/40 tile-3d`}
                 >
                   <img
                     src={normalizeImageUrl(cat.image_url)}

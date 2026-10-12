@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="54" viewBox="0 0 96 54">
+  <defs>
+    <linearGradient id="leaf" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#1F4D14"/>
+      <stop offset=".38" stop-color="#3F8A24"/>
+      <stop offset=".5" stop-color="#66B437"/>
+      <stop offset=".62" stop-color="#3A8021"/>
+      <stop offset="1" stop-color="#1A4310"/>
+    </linearGradient>
+    <linearGradient id="rope" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#E8BE50"/>
+      <stop offset="1" stop-color="#7A5510"/>
+    </linearGradient>
+    <g id="l">
+      <path d="M0 0C4.8 6 5 22 0 36C-5 22-4.8 6 0 0Z" fill="url(#leaf)"/>
+      <path d="M0 1.5V34" stroke="#B9E27E" stroke-opacity=".65" stroke-width=".55" fill="none"/>
+    </g>
+  </defs>
+  <!-- Mango leaves hanging from the rope. Lengths and angles vary so the fringe does not look stamped. -->
+  <use href="#l" transform="translate(6 4) rotate(-5) scale(1 .94)"/>
+  <use href="#l" transform="translate(18 4) rotate(3) scale(1 .78)"/>
+  <use href="#l" transform="translate(30 4) rotate(-2) scale(1 1.06)"/>
+  <use href="#l" transform="translate(42 4) rotate(6) scale(1 .84)"/>
+  <use href="#l" transform="translate(54 4) rotate(-4) scale(1 1)"/>
+  <use href="#l" transform="translate(66 4) rotate(2) scale(1 .76)"/>
+  <use href="#l" transform="translate(78 4) rotate(-6) scale(1 1.1)"/>
+  <use href="#l" transform="translate(90 4) rotate(4) scale(1 .86)"/>
+  <rect y="2" width="96" height="3.2" fill="url(#rope)"/>
+</svg>

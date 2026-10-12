@@ -30,6 +30,8 @@ interface CreateRazorpayOrderPayload {
   total: number;
   reviewRewardCouponId?: string;
   reviewRewardDiscountAmount?: number;
+  spinRewardId?: string;
+  spinRewardDiscountAmount?: number;
   items: RazorpayCartItemInput[];
 }
 

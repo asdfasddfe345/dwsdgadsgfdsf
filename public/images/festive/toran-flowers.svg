@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="46" viewBox="0 0 96 46">
+  <defs>
+    <radialGradient id="shine" cx=".34" cy=".28" r=".8">
+      <stop offset="0" stop-color="#fff" stop-opacity=".5"/>
+      <stop offset=".45" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#3A1200" stop-opacity=".4"/>
+    </radialGradient>
+    <!-- A marigold: three rings of ruffled petals, each ring a disc edged with round dots, under one soft highlight. -->
+    <g id="o">
+      <circle r="5" fill="#DD4F08" stroke="#DD4F08" stroke-width="2.6" stroke-dasharray=".01 2.608" stroke-linecap="round"/>
+      <circle r="3.4" fill="#F57C00" stroke="#F57C00" stroke-width="2.1" stroke-dasharray=".01 2.126" stroke-linecap="round" transform="rotate(18)"/>
+      <circle r="1.9" fill="#FF9F1C" stroke="#FF9F1C" stroke-width="1.5" stroke-dasharray=".01 1.482" stroke-linecap="round"/>
+      <circle r=".9" fill="#FFC857"/>
+      <circle r="6.3" fill="url(#shine)"/>
+    </g>
+    <g id="y">
+      <circle r="5" fill="#E09A00" stroke="#E09A00" stroke-width="2.6" stroke-dasharray=".01 2.608" stroke-linecap="round"/>
+      <circle r="3.4" fill="#F7B500" stroke="#F7B500" stroke-width="2.1" stroke-dasharray=".01 2.126" stroke-linecap="round" transform="rotate(18)"/>
+      <circle r="1.9" fill="#FFD23F" stroke="#FFD23F" stroke-width="1.5" stroke-dasharray=".01 1.482" stroke-linecap="round"/>
+      <circle r=".9" fill="#FFF0A8"/>
+      <circle r="6.3" fill="url(#shine)"/>
+    </g>
+  </defs>
+  <!-- One swag. The flowers at 0 and 96 are the same flower, so the tile repeats without a seam. -->
+  <use href="#o" x="0" y="7"/>
+  <use href="#y" x="12" y="13.1"/>
+  <use href="#o" x="24" y="17.5"/>
+  <use href="#y" x="36" y="20.1"/>
+  <use href="#o" x="48" y="21"/>
+  <use href="#y" x="60" y="20.1"/>
+  <use href="#o" x="72" y="17.5"/>
+  <use href="#y" x="84" y="13.1"/>
+  <use href="#o" x="96" y="7"/>
+</svg>

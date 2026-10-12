@@ -35,6 +35,8 @@ interface CreateCounterOrderPayload {
   paymentMethod: PaymentMethod;
   reviewRewardCouponId?: string;
   reviewRewardDiscountAmount?: number;
+  spinRewardId?: string;
+  spinRewardDiscountAmount?: number;
   items: CounterOrderItemInput[];
 }
 
@@ -62,6 +64,10 @@ class CounterOrderHttpError extends Error {
     this.payload = payload;
   }
 }
+
+// Keep in sync with TAKEAWAY_FEE in supabase/functions/_shared/delivery.ts.
+// The server adds it to every takeaway order and rejects a total that leaves it out.
+export const TAKEAWAY_CHARGE = 10;
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;

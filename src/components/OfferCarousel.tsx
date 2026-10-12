@@ -142,10 +142,11 @@ export default function OfferCarousel({
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.div
             key={activeOffer.id}
-            initial={{ opacity: 0, x: 60 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -60 }}
-            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ opacity: 0, x: 60, rotateY: 50 }}
+            animate={{ opacity: 1, x: 0, rotateY: 0 }}
+            exit={{ opacity: 0, x: -60, rotateY: -50 }}
+            transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+            style={{ transformPerspective: 1200 }}
             className="absolute inset-0"
             aria-live="polite"
           >
@@ -155,7 +156,7 @@ export default function OfferCarousel({
                   src={activeBannerBackgroundImage}
                   alt={activeOffer.title || 'Offer'}
                   loading="eager"
-                  fetchPriority="high"
+                  {...{ fetchpriority: 'high' }}
                   width={1600}
                   height={900}
                   className="absolute inset-0 h-full w-full object-cover object-[76%_center] sm:object-center"
@@ -212,7 +213,7 @@ export default function OfferCarousel({
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.25, duration: 0.35 }}
-                      className="inline-block text-[16px] font-black tracking-tight text-brand-gold drop-shadow-[0_4px_14px_rgba(0,0,0,0.26)] sm:text-[24px] lg:text-[28px]"
+                      className="text-shimmer inline-block text-[16px] font-black tracking-tight drop-shadow-[0_4px_14px_rgba(0,0,0,0.26)] sm:text-[24px] lg:text-[28px]"
                     >
                       {activeBannerReward}
                     </motion.span>

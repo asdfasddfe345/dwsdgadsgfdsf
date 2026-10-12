@@ -10,6 +10,9 @@ import FloatingCart from './components/FloatingCart';
 import RainEffect from './components/RainEffect';
 import SiteClosedOverlay from './components/SiteClosedOverlay';
 import RouteSeo from './components/RouteSeo';
+import ScrollProgress from './components/ScrollProgress';
+import SpinWheel from './components/SpinWheel';
+import { FestiveToran } from './components/Festive';
 import Home from './pages/Home';
 import Menu from './pages/Menu';
 import Cart from './pages/Cart';
@@ -143,9 +146,12 @@ function CustomerLayout({ children }: { children: ReactNode }) {
 
   return (
     <CustomerAccessGate>
+      <ScrollProgress />
       <Header />
+      <FestiveToran />
       <main className="customer-main">{children}</main>
       <FloatingCart />
+      <SpinWheel />
       <Footer />
       <BottomNav />
     </CustomerAccessGate>

@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, Sparkles, Tag, Truck } from 'lucide-react';
-import { motion } from 'motion/react';
+import { ChevronRight, Sparkles, Truck } from 'lucide-react';
+import Waffle3D from '../components/Waffle3D';
+import { flipInOnScroll, useScrollFx } from '../lib/gsap';
+import { getMenuItemDiscount } from '../lib/menuItems';
+import { normalizeImageUrl as normalizeItemImage, setImageFallback } from '../lib/images';
 import OfferCarousel from '../components/OfferCarousel';
 import { useToast } from '../components/Toast';
 import { getOfferBadgeLabel, getOfferCtaHref, getOfferCtaText, getOfferDisplayDescription, getOfferRewardLabel } from '../lib/offers';
@@ -39,13 +42,8 @@ function OfferCard({
 
   if (isPosterMode && backgroundImage) {
     return (
-      <motion.article
-        key={offer.id}
-        initial={{ opacity: 0, y: 16 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.2 }}
-        transition={{ duration: 0.35, delay: Math.min(index * 0.04, 0.16) }}
-        className="group relative overflow-hidden rounded-[28px] border border-brand-border"
+      <article
+        className="offer-card group relative overflow-hidden rounded-[28px] border border-brand-border"
         style={{ minHeight: '220px' }}
       >
         <img
@@ -65,19 +63,12 @@ function OfferCard({
             Order Now
           </Link>
         </div>
-      </motion.article>
+      </article>
     );
   }
 
   return (
-    <motion.article
-      key={offer.id}
-      initial={{ opacity: 0, y: 16 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.2 }}
-      transition={{ duration: 0.35, delay: Math.min(index * 0.04, 0.16) }}
-      className="group relative overflow-hidden rounded-[28px] border border-brand-border bg-brand-surface"
-    >
+    <article className="offer-card coupon group relative overflow-hidden rounded-[28px] border border-brand-border bg-brand-surface">
       {backgroundImage && (
         <>
           <img
@@ -138,22 +129,28 @@ function OfferCard({
           </Link>
         </div>
       </div>
-    </motion.article>
+    </article>
   );
 }
 
 export default function OffersPage() {
   const [offers, setOffers] = useState<Offer[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [menuItems, setMenuItems] = useState<Array<Pick<MenuItem, 'id' | 'category_id'>>>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const { showToast } = useToast();
+  const pageRef = useRef<HTMLDivElement>(null);
+
+  useScrollFx(pageRef, () => {
+    flipInOnScroll('.offer-card');
+    flipInOnScroll('.deal-tile');
+  }, [loading]);
 
   const loadData = useCallback(async () => {
     const [offerRes, categoryRes, menuItemsRes] = await Promise.all([
       supabase.from('offers').select('*').eq('is_active', true).order('created_at', { ascending: false }),
       supabase.from('categories').select('*').order('display_order'),
-      supabase.from('menu_items').select('id, category_id').eq('is_available', true),
+      supabase.from('menu_items').select('*').eq('is_available', true),
     ]);
 
     if (offerRes.error) {
@@ -171,7 +168,7 @@ export default function OffersPage() {
     if (menuItemsRes.error) {
       showToast(menuItemsRes.error.message || 'Failed to load offer items', 'error');
     } else {
-      setMenuItems((menuItemsRes.data || []) as Array<Pick<MenuItem, 'id' | 'category_id'>>);
+      setMenuItems((menuItemsRes.data || []) as MenuItem[]);
     }
 
     setLoading(false);
@@ -187,6 +184,11 @@ export default function OffersPage() {
   );
   const menuItemsById = useMemo(
     () => Object.fromEntries(menuItems.map((item) => [item.id, item])),
+    [menuItems],
+  );
+
+  const dealItems = useMemo(
+    () => menuItems.filter((item) => getMenuItemDiscount(item.price, item.original_price)),
     [menuItems],
   );
 
@@ -213,17 +215,20 @@ export default function OffersPage() {
   }), [visibleOffers]);
 
   return (
-    <div className="min-h-screen bg-brand-bg pb-20">
+    <div ref={pageRef} className="min-h-screen bg-brand-bg pb-20">
       <section className="section-padding pt-8 pb-4">
         <span className="section-label">Offers</span>
         <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <h1 className="text-3xl font-black leading-tight text-white sm:text-4xl lg:text-5xl">
-              Deals customers can swipe through and claim fast
-            </h1>
-            <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-brand-text-muted sm:text-base">
-              Active promotions rotate automatically here, and customers can still move the carousel themselves with arrows, dots, or swipe.
-            </p>
+          <div className="flex max-w-3xl items-center gap-4">
+            <Waffle3D size={104} className="order-last sm:order-first" />
+            <div className="min-w-0 flex-1">
+              <h1 className="text-rise font-display text-3xl font-black leading-tight text-white sm:text-4xl lg:text-5xl">
+                Today's offers
+              </h1>
+              <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-brand-text-muted sm:text-base">
+                Coupons and price drops you can use on your next order.
+              </p>
+            </div>
           </div>
           <Link
             to="/menu"
@@ -244,27 +249,42 @@ export default function OffersPage() {
             menuItemsById={menuItemsById}
           />
         ) : visibleOffers.length > 0 ? null : (
-          <div className="rounded-[24px] border border-brand-border bg-brand-surface p-8 text-center text-brand-text-dim">
-            No active offers right now.
+          <div className="depth-card flex flex-col items-center gap-3 p-8 text-center text-brand-text-muted">
+            <Waffle3D size={150} />
+            <p>No coupons running right now. Price drops on the menu still apply.</p>
           </div>
         )}
       </section>
 
-      {visibleOffers.length > 0 && (
+      {dealItems.length > 0 && (
         <section className="section-padding py-4">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              { icon: Tag, label: `${visibleOffers.length} live offer${visibleOffers.length === 1 ? '' : 's'}` },
-              { icon: Sparkles, label: 'Auto moving carousel' },
-              { icon: ChevronRight, label: 'Manual arrows and dots' },
-            ].map((item) => (
-              <div key={item.label} className="rounded-2xl border border-brand-border bg-brand-surface/85 px-4 py-3 text-[13px] font-semibold text-brand-text-muted">
-                <div className="flex items-center gap-2">
-                  <item.icon size={15} className="text-brand-gold" strokeWidth={2.4} />
-                  <span>{item.label}</span>
-                </div>
-              </div>
-            ))}
+          <span className="section-label">Price drops</span>
+          <p className="mt-1 text-[13px] text-brand-text-muted">Already marked down, so you don't need a code.</p>
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {dealItems.map((item) => {
+              const discount = getMenuItemDiscount(item.price, item.original_price);
+              return (
+                <Link key={item.id} to={`/menu?item=${item.id}`} className="deal-tile depth-card relative block overflow-hidden">
+                  <span className="deal-ribbon">{discount?.percent}% OFF</span>
+                  <img
+                    src={normalizeItemImage(item.image_url)}
+                    alt={item.name}
+                    loading="lazy"
+                    width={300}
+                    height={300}
+                    onError={setImageFallback}
+                    className="aspect-square w-full object-cover"
+                  />
+                  <div className="px-2.5 py-2">
+                    <p className="truncate text-[13px] font-semibold text-white">{item.name}</p>
+                    <p className="text-[14px] font-extrabold text-brand-gold">
+                      &#8377;{item.price}{' '}
+                      <span className="text-[12px] font-semibold text-brand-text-dim line-through">&#8377;{discount?.original}</span>
+                    </p>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </section>
       )}

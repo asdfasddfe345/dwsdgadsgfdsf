@@ -29,11 +29,13 @@ import { getCheckoutCustomerPhoneForApi, getRazorpayPrefillContact } from '../li
 import { getServiceModeLabel } from '../lib/orderLabels';
 import { menuItemSupportsCustomizations } from '../lib/menuItems';
 import { fetchCustomizationAvailability, itemHasAssignedCustomizations, type CustomizationAvailability } from '../lib/customizations';
-import { createCounterOrder } from '../lib/counterOrder';
+import { createCounterOrder, TAKEAWAY_CHARGE } from '../lib/counterOrder';
 import { suggestCartAddOns } from '../lib/cartSuggestions';
 import { calculateReviewRewardDiscount } from '../lib/itemReviews';
+import { calculateSpinRewardDiscount, describeSpinReward, isSpinRewardUsable } from '../lib/spinRewards';
+import { fetchSpinRewards } from '../lib/spinWheel';
 import { trackInitiateCheckout } from '../lib/metaPixel';
-import type { DeliveryZone, MenuItem, Order, OrderType, PaymentMethod, Offer, PickupOption, ReviewRewardCoupon, SelectedCustomization, MapConfirmData } from '../types';
+import type { DeliveryZone, MenuItem, Order, OrderType, PaymentMethod, Offer, PickupOption, ReviewRewardCoupon, SelectedCustomization, SpinReward, MapConfirmData } from '../types';
 import { useToast } from '../components/Toast';
 import { RAZORPAY_BRAND_IMAGE, buildRazorpayCallbackUrl, cancelRazorpayPayment, createRazorpayOrder, loadRazorpayScript, verifyRazorpayPayment } from '../lib/razorpay';
 import { playOrderSound } from '../lib/sounds';
@@ -41,7 +43,6 @@ import CustomizationModal from '../components/CustomizationModal';
 import LocationPicker from '../components/LocationPicker';
 
 const SESSION_KEYWORDS = ['session expired', 'sign in again', 'please sign in'];
-const TAKEAWAY_CHARGE = 10;
 const DELIVERY_CHECKOUT_ENABLED = true;
 const FREE_DELIVERY_THRESHOLD = 299;
 const RESTAURANT_LAT = 16.4724;
@@ -239,6 +240,8 @@ export default function CartPage() {
   const [selectedAutomaticOfferId, setSelectedAutomaticOfferId] = useState<string | null>(null);
   const [reviewRewardCoupons, setReviewRewardCoupons] = useState<ReviewRewardCoupon[]>([]);
   const [selectedReviewRewardCouponId, setSelectedReviewRewardCouponId] = useState<string | null>(null);
+  const [spinRewards, setSpinRewards] = useState<SpinReward[]>([]);
+  const [selectedSpinRewardId, setSelectedSpinRewardId] = useState<string | null>(null);
   const [couponError, setCouponError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [editingItem, setEditingItem] = useState<{
@@ -369,6 +372,31 @@ export default function CartPage() {
 
       setReviewRewardCoupons(data || []);
     })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setSpinRewards([]);
+      setSelectedSpinRewardId(null);
+      return;
+    }
+
+    let isMounted = true;
+
+    void fetchSpinRewards(user.id).then((rewards) => {
+      if (!isMounted) {
+        return;
+      }
+
+      // A won prize is applied straight away; the customer can still remove it in the offers step.
+      const usableRewards = rewards.filter((reward) => isSpinRewardUsable(reward));
+      setSpinRewards(usableRewards);
+      setSelectedSpinRewardId(usableRewards[0]?.id ?? null);
+    });
 
     return () => {
       isMounted = false;
@@ -545,7 +573,15 @@ export default function CartPage() {
     })),
   ];
   const featuredAutomaticOffer = selectedAutomaticOffer?.offer || applicableAutomaticOffers[0]?.offer || activeOffers.find((offer) => getOfferMode(offer) === 'automatic' && isOfferApplicableToOrderType(offer, pricingContext)) || null;
-  const discount = Math.min(subtotal, couponDiscount + automaticDiscount + reviewRewardDiscount);
+  const spinRewardOptions = spinRewards.map((reward) => ({
+    reward,
+    amount: calculateSpinRewardDiscount(reward, subtotal, checkoutItems),
+  }));
+  const selectedSpinRewardOption = spinRewardOptions.find((option) => option.reward.id === selectedSpinRewardId) || null;
+  const spinRewardDiscount = selectedSpinRewardOption?.amount || 0;
+  // A prize that gives nothing on this cart (buy 1 get 1 with one item) is not sent, so it is not used up.
+  const spinRewardIdForOrder = spinRewardDiscount > 0 ? selectedSpinRewardOption?.reward.id : undefined;
+  const discount = Math.min(subtotal, couponDiscount + automaticDiscount + reviewRewardDiscount + spinRewardDiscount);
   const deliveryFee = activeOrderType === 'delivery'
     ? (subtotal >= FREE_DELIVERY_THRESHOLD ? 0 : getDistanceBasedDeliveryFee(deliveryLat, deliveryLng))
     : 0;
@@ -740,6 +776,8 @@ export default function CartPage() {
       total: checkoutTotal,
       reviewRewardCouponId: selectedReviewRewardCoupon?.id,
       reviewRewardDiscountAmount: reviewRewardDiscount,
+      spinRewardId: spinRewardIdForOrder,
+      spinRewardDiscountAmount: spinRewardDiscount,
       items: checkoutItems,
     });
     const razorpayCallbackUrl = buildRazorpayCallbackUrl(razorpayOrder.appOrderId);
@@ -1191,6 +1229,8 @@ export default function CartPage() {
         paymentMethod: checkoutPaymentMethod,
         reviewRewardCouponId: selectedReviewRewardCoupon?.id,
         reviewRewardDiscountAmount: reviewRewardDiscount,
+        spinRewardId: spinRewardIdForOrder,
+        spinRewardDiscountAmount: spinRewardDiscount,
         items: checkoutItems,
       });
 
@@ -1689,6 +1729,12 @@ export default function CartPage() {
                 <span className="tabular-nums">-{'\u20B9'}{reviewRewardDiscount.toFixed(0)}</span>
               </div>
             )}
+            {spinRewardDiscount > 0 && (
+              <div className="flex justify-between text-emerald-400">
+                <span className="text-[13px]">Spin prize</span>
+                <span className="tabular-nums">-{'\u20B9'}{spinRewardDiscount.toFixed(0)}</span>
+              </div>
+            )}
             {promoRewardItems.length > 0 && (
               <div className="flex justify-between text-emerald-300">
                 <span className="text-[13px]">Free items added</span>
@@ -1768,6 +1814,10 @@ export default function CartPage() {
             couponDiscount={couponDiscount}
             automaticDiscount={automaticDiscount}
             reviewRewardDiscount={reviewRewardDiscount}
+            spinRewardDiscount={spinRewardDiscount}
+            spinRewardOptions={spinRewardOptions}
+            selectedSpinRewardId={selectedSpinRewardId}
+            onSelectSpinReward={setSelectedSpinRewardId}
             discount={discount}
             addOnTotal={addOnTotal}
             rewardItemCount={promoRewardItems.reduce((sum, item) => sum + item.quantity, 0)}
@@ -1872,6 +1922,10 @@ function CheckoutFlowModal({
   couponDiscount,
   automaticDiscount,
   reviewRewardDiscount,
+  spinRewardDiscount,
+  spinRewardOptions,
+  selectedSpinRewardId,
+  onSelectSpinReward,
   discount,
   addOnTotal,
   rewardItemCount,
@@ -1933,6 +1987,10 @@ function CheckoutFlowModal({
   couponDiscount: number;
   automaticDiscount: number;
   reviewRewardDiscount: number;
+  spinRewardDiscount: number;
+  spinRewardOptions: Array<{ reward: SpinReward; amount: number }>;
+  selectedSpinRewardId: string | null;
+  onSelectSpinReward: (id: string | null) => void;
   discount: number;
   addOnTotal: number;
   rewardItemCount: number;
@@ -2223,6 +2281,40 @@ function CheckoutFlowModal({
               </div>
             )}
 
+            {spinRewardOptions.length > 0 && (
+              <div className="rounded-2xl border border-brand-gold/20 bg-brand-gold/[0.06] p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Gift size={15} className="text-brand-gold" />
+                    <span className="text-[13px] font-bold text-brand-gold">Spin wheel prize</span>
+                  </div>
+                  {selectedSpinRewardId && (
+                    <button onClick={() => onSelectSpinReward(null)} className="text-[12px] font-bold text-brand-text-muted hover:text-white">Remove</button>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {spinRewardOptions.map(({ reward, amount }) => {
+                    const isSelected = selectedSpinRewardId === reward.id;
+                    return (
+                      <button
+                        key={reward.id}
+                        onClick={() => onSelectSpinReward(reward.id)}
+                        className={`w-full rounded-xl border px-3 py-2.5 text-left transition-colors ${isSelected ? 'border-brand-gold/50 bg-brand-gold/15' : 'border-brand-border bg-brand-surface/40 hover:border-brand-gold/30'}`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`text-[13px] font-bold ${isSelected ? 'text-brand-gold' : 'text-white'}`}>{reward.label}</span>
+                          <span className="text-[12px] font-black text-emerald-400">
+                            {amount > 0 ? `Save ₹${amount.toFixed(0)}` : 'Add 1 more item'}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-[11px] text-brand-text-muted">{describeSpinReward(reward)}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {featuredAutomaticOffer && (
               <div className="rounded-2xl border border-brand-gold/20 bg-brand-gold/[0.06] p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2">
@@ -2356,6 +2448,7 @@ function CheckoutFlowModal({
               couponDiscount={couponDiscount}
               automaticDiscount={automaticDiscount}
               reviewRewardDiscount={reviewRewardDiscount}
+              spinRewardDiscount={spinRewardDiscount}
               discount={discount}
               addOnTotal={addOnTotal}
               rewardItemCount={rewardItemCount}
@@ -2440,6 +2533,7 @@ function CheckoutBillSummary({
   couponDiscount,
   automaticDiscount,
   reviewRewardDiscount,
+  spinRewardDiscount,
   discount,
   addOnTotal,
   rewardItemCount,
@@ -2451,6 +2545,7 @@ function CheckoutBillSummary({
   couponDiscount: number;
   automaticDiscount: number;
   reviewRewardDiscount: number;
+  spinRewardDiscount: number;
   discount: number;
   addOnTotal: number;
   rewardItemCount: number;
@@ -2489,6 +2584,12 @@ function CheckoutBillSummary({
           <div className="flex justify-between gap-3 text-emerald-400">
             <span>Review reward</span>
             <span className="tabular-nums">-₹{reviewRewardDiscount.toFixed(0)}</span>
+          </div>
+        )}
+        {spinRewardDiscount > 0 && (
+          <div className="flex justify-between gap-3 text-emerald-400">
+            <span>Spin prize</span>
+            <span className="tabular-nums">-₹{spinRewardDiscount.toFixed(0)}</span>
           </div>
         )}
         {rewardItemCount > 0 && (

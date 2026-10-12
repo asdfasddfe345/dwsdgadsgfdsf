@@ -6,6 +6,10 @@ import {
   reserveReviewRewardCoupon,
 } from "../_shared/review-rewards.ts";
 import {
+  reserveSpinReward,
+  verifySpinRewardForOrder,
+} from "../_shared/spin-rewards.ts";
+import {
   expireStalePendingOrders,
   releaseOrderInventory,
   reserveOrderInventory,
@@ -60,6 +64,8 @@ interface CreateBody {
   paymentMethod?: "cod" | "upi" | "card";
   reviewRewardCouponId?: string;
   reviewRewardDiscountAmount?: number;
+  spinRewardId?: string;
+  spinRewardDiscountAmount?: number;
   items?: CounterOrderItem[];
 }
 
@@ -92,6 +98,9 @@ type AppOrderInsert = {
   payment_status: "pending" | "paid";
   review_reward_coupon_id: string | null;
   review_reward_discount_amount: number;
+  // Only sent when a spin prize is used, so orders without one work before the spin wheel migration has run.
+  spin_reward_id?: string;
+  spin_reward_discount_amount?: number;
 };
 
 type AppOrderInsertCompat = Omit<
@@ -329,6 +338,8 @@ Deno.serve(async (req: Request) => {
     const total = Number(body.total ?? 0);
     const reviewRewardCouponId = body.reviewRewardCouponId?.trim() || "";
     const reviewRewardDiscountAmount = Number(body.reviewRewardDiscountAmount ?? 0);
+    const spinRewardId = body.spinRewardId?.trim() || "";
+    const spinRewardDiscountAmount = Number(body.spinRewardDiscountAmount ?? 0);
 
     if (!customerName || !customerEmail || !isValidEmail(customerEmail)) {
       return jsonResponse({ success: false, error: "Customer name and email are required" }, 400);
@@ -461,6 +472,18 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    const spinRewardCheck = await verifySpinRewardForOrder(adminClient, {
+      rewardId: spinRewardId,
+      claimedDiscount: spinRewardDiscountAmount,
+      userId: user?.id ?? null,
+      subtotal,
+      items,
+    });
+
+    if ("error" in spinRewardCheck) {
+      return jsonResponse({ success: false, error: spinRewardCheck.error }, spinRewardCheck.status);
+    }
+
     const paymentStatus = total <= 0 ? "paid" : "pending";
 
     const orderInsert: AppOrderInsert = {
@@ -492,6 +515,9 @@ Deno.serve(async (req: Request) => {
       payment_status: paymentStatus,
       review_reward_coupon_id: reviewRewardCouponId || null,
       review_reward_discount_amount: expectedReviewRewardDiscount,
+      ...(spinRewardId
+        ? { spin_reward_id: spinRewardId, spin_reward_discount_amount: spinRewardCheck.discount }
+        : {}),
     };
 
     const { data: order, error: orderError } = await createAppOrder(adminClient, orderInsert);
@@ -523,6 +549,16 @@ Deno.serve(async (req: Request) => {
         success: false,
         error: inventoryReservation.error || "Some items are out of stock right now",
       }, 409);
+    }
+
+    // Claimed before the review reward: deleting the order frees a spin prize by itself, but not a review reward.
+    if (spinRewardId && user) {
+      const spinRewardReserved = await reserveSpinReward(adminClient, spinRewardId, user.id, order.id);
+
+      if (!spinRewardReserved) {
+        await cleanupCreatedOrder(adminClient, order.id);
+        throw new Error("This spin prize is no longer available");
+      }
     }
 
     if (reviewRewardCouponId && user) {

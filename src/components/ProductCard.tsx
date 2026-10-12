@@ -6,6 +6,7 @@ import { useCart } from '../contexts/CartContext';
 import { FALLBACK_IMAGE_SRC, normalizeImageUrl } from '../lib/images';
 import { getMenuItemDietaryBadges } from '../lib/menuItemDietary';
 import { getMenuItemDiscount } from '../lib/menuItems';
+import Tilt3D from './Tilt3D';
 
 interface ProductCardProps {
   item: MenuItem;
@@ -50,8 +51,9 @@ export default function ProductCard({ item, onImageClick, onAdd }: ProductCardPr
   }
 
   return (
+    <Tilt3D className="rounded-2xl">
     <div
-      className="flex flex-col overflow-hidden rounded-2xl border border-brand-border bg-brand-surface transition-all duration-200 hover:border-brand-border-strong cursor-pointer"
+      className="depth-card flex flex-col overflow-hidden cursor-pointer"
       onClick={() => onImageClick(item)}
     >
       {/* Image */}
@@ -68,6 +70,8 @@ export default function ProductCard({ item, onImageClick, onAdd }: ProductCardPr
           }}
           className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
         />
+
+        {discount && <span className="deal-ribbon">{discount.percent}% OFF</span>}
 
         {/* Dietary badges */}
         {dietaryBadges.length > 0 && (
@@ -161,17 +165,13 @@ export default function ProductCard({ item, onImageClick, onAdd }: ProductCardPr
             &#8377;{item.price}
           </p>
           {discount && (
-            <>
-              <span className="text-[12px] font-semibold text-brand-text-dim line-through">
-                &#8377;{discount.original}
-              </span>
-              <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-400">
-                {discount.percent}% OFF
-              </span>
-            </>
+            <span className="text-[12px] font-semibold text-brand-text-dim line-through">
+              &#8377;{discount.original}
+            </span>
           )}
         </div>
       </div>
     </div>
+    </Tilt3D>
   );
 }

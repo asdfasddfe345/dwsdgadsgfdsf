@@ -17,6 +17,7 @@ import { playAddToCartSound } from '../lib/sounds';
 import { staggerContainer, staggerChild } from '../lib/animations';
 import { fetchCustomizationAvailability, itemHasAssignedCustomizations, type CustomizationAvailability } from '../lib/customizations';
 import { fetchMenuPopularity, type MenuPopularityContext } from '../lib/menuPopularity';
+import { flipInOnScroll, revealRail, ScrollTrigger, useScrollFx } from '../lib/gsap';
 
 function setNamedMeta(name: string, content: string) {
   upsertHeadTag(`meta[name="${name}"]`, 'meta', { name, content });
@@ -222,6 +223,14 @@ export default function MenuPage() {
     () => popularityContext.rankedItems.filter((item) => item.is_available !== false).slice(0, 12),
     [popularityContext.rankedItems],
   );
+
+  const gridRef = useRef<HTMLDivElement>(null);
+  useScrollFx(gridRef, () => flipInOnScroll('.menu-card'), [loading, activeCategory, sortBy]);
+
+  // Searching can reorder the grid without changing the page height, so re-measure the triggers.
+  useEffect(() => {
+    ScrollTrigger.refresh();
+  }, [filteredItems]);
 
   function handleCategoryChange(slug: string) {
     setActiveCategory(slug);
@@ -429,7 +438,7 @@ export default function MenuPage() {
         <section className="section-padding pt-6 pb-2">
           <div className="max-w-3xl">
             <span className="section-label">Menu</span>
-            <h1 className="mt-3 text-3xl font-black leading-tight text-white sm:text-4xl">
+            <h1 className="text-rise mt-3 text-3xl font-black leading-tight text-white sm:text-4xl">
               Waffle Menu
             </h1>
             <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-brand-text-muted sm:text-base">
@@ -510,7 +519,7 @@ export default function MenuPage() {
         </div>
       </div>
 
-      <div className="px-4 py-4">
+      <div ref={gridRef} className="px-4 py-4">
         <div className="flex items-center justify-between mb-4">
           <div className="text-[13px] font-semibold text-brand-text-dim">
             {filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''}
@@ -546,19 +555,13 @@ export default function MenuPage() {
             <p className="text-brand-text-dim text-[14px] font-medium">Try adjusting your filters or search terms</p>
           </motion.div>
         ) : (
-          <motion.div
-            className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 items-start"
-            variants={staggerContainer}
-            initial="hidden"
-            animate="visible"
-            key={`${activeCategory}-${sortBy}`}
-          >
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 items-start">
             {filteredItems.map((item) => (
-              <motion.div key={item.id} variants={staggerChild} className="self-start">
+              <div key={item.id} className="menu-card self-start">
                 <ProductCard item={item} onImageClick={handleImageClick} onAdd={handleAdd} />
-              </motion.div>
+              </div>
             ))}
-          </motion.div>
+          </div>
         )}
       </div>
 
@@ -627,6 +630,10 @@ function MenuBestSellerRail({
   onSeeAll: () => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  useScrollFx(sectionRef, () => {
+    if (sectionRef.current) revealRail(sectionRef.current);
+  }, []);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
 
@@ -653,8 +660,8 @@ function MenuBestSellerRail({
   }
 
   return (
-    <section className="pt-4 pb-2">
-      <div className="px-4 flex items-center justify-between mb-3">
+    <section ref={sectionRef} className="pt-4 pb-2">
+      <div className="rail-head px-4 flex items-center justify-between mb-3">
         <div>
           <div className="flex items-center gap-2">
             <Flame size={18} className="text-orange-400" strokeWidth={2.5} />
@@ -675,10 +682,10 @@ function MenuBestSellerRail({
       <div className="relative group/rail">
         <div
           ref={scrollRef}
-          className="flex gap-3 overflow-x-auto scrollbar-hide px-4 snap-x snap-mandatory"
+          className="rail-row flex gap-3 overflow-x-auto scrollbar-hide px-4 py-3 -my-2 snap-x snap-mandatory"
         >
           {items.map((item) => (
-            <div key={item.id} className="flex-shrink-0 snap-start" style={{ width: 'clamp(108px, 32vw, 156px)' }}>
+            <div key={item.id} className="rail-card flex-shrink-0 snap-start" style={{ width: 'clamp(108px, 32vw, 156px)' }}>
               <ProductCard item={item} onImageClick={onImageClick} onAdd={onAdd} />
             </div>
           ))}

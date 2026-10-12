@@ -251,6 +251,30 @@ export interface ReviewRewardCoupon {
   created_at: string;
 }
 
+export type SpinPrizeKind = 'percent' | 'bogo' | 'free_item';
+
+export interface SpinPrize {
+  id: string;
+  label: string;
+  kind: SpinPrizeKind;
+  percent: number;
+  display_order: number;
+}
+
+export interface SpinReward {
+  id: string;
+  user_id: string;
+  prize_id: string | null;
+  label: string;
+  kind: SpinPrizeKind;
+  percent: number;
+  spin_day: string;
+  expires_at: string;
+  redeemed_order_id: string | null;
+  redeemed_at: string | null;
+  created_at: string;
+}
+
 export type AddressLabel = 'Home' | 'Work' | 'Other';
 
 export interface SavedAddress {

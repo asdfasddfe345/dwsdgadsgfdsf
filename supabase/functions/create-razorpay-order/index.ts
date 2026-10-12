@@ -7,6 +7,10 @@ import {
   reserveReviewRewardCoupon,
 } from "../_shared/review-rewards.ts";
 import {
+  reserveSpinReward,
+  verifySpinRewardForOrder,
+} from "../_shared/spin-rewards.ts";
+import {
   expireStalePendingOrders,
   reserveOrderInventory,
 } from "../_shared/inventory.ts";
@@ -50,6 +54,8 @@ interface CreateBody {
   total?: number;
   reviewRewardCouponId?: string;
   reviewRewardDiscountAmount?: number;
+  spinRewardId?: string;
+  spinRewardDiscountAmount?: number;
   items?: CheckoutItem[];
 }
 
@@ -74,6 +80,9 @@ type AppOrderInsert = {
   payment_status: "pending";
   review_reward_coupon_id: string | null;
   review_reward_discount_amount: number;
+  // Only sent when a spin prize is used, so orders without one work before the spin wheel migration has run.
+  spin_reward_id?: string;
+  spin_reward_discount_amount?: number;
 };
 
 type AppOrderInsertCompat = Omit<
@@ -267,6 +276,8 @@ Deno.serve(async (req: Request) => {
     const total = Number(body.total ?? 0);
     const reviewRewardCouponId = body.reviewRewardCouponId?.trim() || "";
     const reviewRewardDiscountAmount = Number(body.reviewRewardDiscountAmount ?? 0);
+    const spinRewardId = body.spinRewardId?.trim() || "";
+    const spinRewardDiscountAmount = Number(body.spinRewardDiscountAmount ?? 0);
 
     if (!customerName || !customerEmail || !isValidEmail(customerEmail)) {
       return jsonResponse({ success: false, error: "Customer name and email are required" }, 400);
@@ -405,6 +416,18 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    const spinRewardCheck = await verifySpinRewardForOrder(adminClient, {
+      rewardId: spinRewardId,
+      claimedDiscount: spinRewardDiscountAmount,
+      userId: user?.id ?? null,
+      subtotal,
+      items,
+    });
+
+    if ("error" in spinRewardCheck) {
+      return jsonResponse({ success: false, error: spinRewardCheck.error }, spinRewardCheck.status);
+    }
+
     const orderInsert: AppOrderInsert = {
       user_id: user?.id ?? null,
       customer_name: customerName,
@@ -426,6 +449,9 @@ Deno.serve(async (req: Request) => {
       payment_status: "pending",
       review_reward_coupon_id: reviewRewardCouponId || null,
       review_reward_discount_amount: expectedReviewRewardDiscount,
+      ...(spinRewardId
+        ? { spin_reward_id: spinRewardId, spin_reward_discount_amount: spinRewardCheck.discount }
+        : {}),
     };
 
     const { data: order, error: orderError } = await createAppOrder(adminClient, orderInsert);
@@ -478,6 +504,24 @@ Deno.serve(async (req: Request) => {
         success: false,
         error: inventoryReservation.error || "Some items are out of stock right now",
       }, 409);
+    }
+
+    // A spin prize frees itself when its order is marked failed or expired (database trigger),
+    // so the failure branches below need no extra release step for it.
+    if (spinRewardId && user) {
+      const spinRewardReserved = await reserveSpinReward(adminClient, spinRewardId, user.id, order.id);
+
+      if (!spinRewardReserved) {
+        await adminClient
+          .from("orders")
+          .update({
+            payment_status: "failed",
+            status: "expired",
+          })
+          .eq("id", order.id);
+
+        throw new Error("This spin prize is no longer available");
+      }
     }
 
     let rewardReserved = false;

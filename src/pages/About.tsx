@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Shield, Leaf, Award, Phone, MessageCircle, Mail, MapPin, Send } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../components/Toast';
+import { flipInOnScroll, gsap, useScrollFx } from '../lib/gsap';
 
 export default function AboutPage() {
   const [name, setName] = useState('');
@@ -9,6 +10,32 @@ export default function AboutPage() {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const { showToast } = useToast();
+  const pageRef = useRef<HTMLDivElement>(null);
+
+  useScrollFx(pageRef, () => {
+    gsap.fromTo(
+      '.about-hero-img',
+      { yPercent: -8, scale: 1.2 },
+      { yPercent: 8, ease: 'none', scrollTrigger: { trigger: '.about-hero', start: 'top top', end: 'bottom top', scrub: true } },
+    );
+    flipInOnScroll('.about-card');
+
+    // Pin the section and turn vertical scrolling into a sideways pass over the cards.
+    const track = gsap.utils.toArray<HTMLElement>('.about-track')[0];
+    const distance = () => Math.max(0, track.scrollWidth - window.innerWidth);
+    gsap.to(track, {
+      x: () => -distance(),
+      ease: 'none',
+      scrollTrigger: {
+        trigger: '.about-pin',
+        start: 'center center',
+        end: () => `+=${distance()}`,
+        pin: true,
+        scrub: 0.5,
+        invalidateOnRefresh: true,
+      },
+    });
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -30,26 +57,26 @@ export default function AboutPage() {
   }
 
   return (
-    <div className="bg-brand-bg min-h-screen animate-fade-in">
-      <section className="relative overflow-hidden">
+    <div ref={pageRef} className="bg-brand-bg min-h-screen animate-fade-in">
+      <section className="about-hero relative overflow-hidden">
         <div className="absolute inset-0">
           <img
             src="https://images.pexels.com/photos/2103124/pexels-photo-2103124.jpeg?auto=compress&cs=tinysrgb&w=1920&h=600&fit=crop"
             alt="Fresh gourmet waffles from The Supreme Waffle"
             loading="eager"
-            fetchPriority="high"
+            {...{ fetchpriority: 'high' }}
             width={1920}
             height={600}
-            className="w-full h-full object-cover opacity-20"
+            className="about-hero-img w-full h-full object-cover opacity-20"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-brand-bg via-brand-bg/95 to-brand-bg/70" />
         </div>
         <div className="relative section-padding py-24 lg:py-32">
           <div className="max-w-2xl">
             <span className="section-label">Our Story</span>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white mt-3 mb-6 leading-tight">
+            <h1 className="text-rise text-3xl sm:text-4xl lg:text-5xl font-black text-white mt-3 mb-6 leading-tight">
               Crafted with Passion,{' '}
-              <span className="text-brand-gold">Served with Love</span>
+              <span className="text-shimmer">Served with Love</span>
             </h1>
             <p className="text-brand-text-muted text-lg leading-relaxed max-w-xl">
               Born from a love of crispy, golden waffles and a dream to make premium quality accessible to everyone. Every waffle at The Supreme Waffle is handcrafted using the finest ingredients, baked to golden perfection.
@@ -58,12 +85,12 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="section-padding py-16 lg:py-24">
-        <div className="text-center mb-12">
+      <section className="about-pin overflow-hidden py-10">
+        <div className="text-center mb-8">
           <span className="section-label">Why Choose Us</span>
           <h2 className="section-title">What Sets Us Apart</h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 lg:gap-8">
+        <div className="about-track flex w-max gap-6 px-4 pb-6">
           {[
             { icon: Shield, title: 'Hygiene First', desc: 'FSSAI certified kitchen. Daily sanitization protocols. Sealed packaging for every order.' },
             { icon: Leaf, title: 'Fresh Ingredients', desc: 'We source premium ingredients daily. No preservatives, no artificial flavors. Pure goodness.' },
@@ -71,7 +98,7 @@ export default function AboutPage() {
           ].map((item) => (
             <div
               key={item.title}
-              className="bg-brand-surface rounded-xl p-6 border border-brand-border hover:border-brand-gold/20 transition-all duration-300 text-center"
+              className="depth-card w-[78vw] flex-none p-6 text-center sm:w-[60vw] lg:w-[44vw]"
             >
               <div className="w-14 h-14 bg-brand-gold/10 rounded-xl flex items-center justify-center mx-auto mb-5">
                 <item.icon size={28} strokeWidth={2.2} className="text-brand-gold" />
@@ -91,7 +118,7 @@ export default function AboutPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-            <div className="bg-brand-surface rounded-xl p-6 border border-brand-border">
+            <div className="about-card depth-card p-6">
               <h3 className="font-bold text-xl text-white mb-6">Reach Out Directly</h3>
               <div className="space-y-5 mb-8">
                 {[
@@ -121,7 +148,7 @@ export default function AboutPage() {
               </a>
             </div>
 
-            <div className="bg-brand-surface rounded-xl p-6 border border-brand-border">
+            <div className="about-card depth-card p-6">
               <h3 className="font-bold text-xl text-white mb-6">Send Us a Message</h3>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <input type="text" placeholder="Your Name" value={name} onChange={(e) => setName(e.target.value)} className="input-field" />

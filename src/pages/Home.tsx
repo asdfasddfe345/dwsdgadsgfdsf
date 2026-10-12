@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, ChevronRight, Flame, Star, ArrowRight } from 'lucide-react';
-import { AnimatePresence, motion, useInView, type Variants } from 'framer-motion';
+import { AnimatePresence } from 'motion/react';
 import OfferCarousel from '../components/OfferCarousel';
 import CategoryCarousel from '../components/CategoryCarousel';
+import { FestiveBanner } from '../components/Festive';
 import { expireStalePendingOrders } from '../lib/inventorySchema';
 import { supabase } from '../lib/supabase';
 import { sortCategoriesForMenu } from '../lib/categoryOrdering';
 import { fetchMenuPopularity, type MenuPopularityContext } from '../lib/menuPopularity';
-import { normalizeImageUrl, setImageFallback } from '../lib/images';
 import { useCart } from '../contexts/CartContext';
 import { useToast } from '../components/Toast';
 import ProductCard from '../components/ProductCard';
@@ -16,7 +16,8 @@ import CustomizationModal from '../components/CustomizationModal';
 import ScrollReveal from '../components/ScrollReveal';
 import { fetchCustomizationAvailability, itemHasAssignedCustomizations, type CustomizationAvailability } from '../lib/customizations';
 import { installHomeSnapState, readHomeSnapshot, writeHomeSnapshot } from '../lib/homeSnapshot';
-import { getOfferCtaHref } from '../lib/offers';
+import { getMenuItemDiscount } from '../lib/menuItems';
+import { revealRail, useScrollFx } from '../lib/gsap';
 import type { Category, MenuItem, Offer } from '../types';
 
 const seoFaqs = [
@@ -33,11 +34,6 @@ const seoFaqs = [
     answer: 'Yes. The website supports online ordering for dine-in and takeaway pickup.',
   },
 ];
-
-const sectionVariants: Variants = {
-  hidden: { opacity: 0, y: 28 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1] } },
-};
 
 export default function Home() {
   const initialSnapshot = useMemo(() => readHomeSnapshot(), []);
@@ -166,27 +162,10 @@ export default function Home() {
     setPendingAddOnItem({ cartItemId, menuItem: item, quantity: qty });
   }, [addItem, customizationAvailability, showToast]);
 
-  const itemsByCategory = useMemo(() => {
-    const sortedCategories = [...categories].sort((left, right) => {
-      const categoryScoreDelta = (popularityContext.categoryScores[right.id] || 0) - (popularityContext.categoryScores[left.id] || 0);
-      if (categoryScoreDelta !== 0) return categoryScoreDelta;
-      const fallbackCategoryDelta = (popularityContext.fallbackCategoryScores[right.id] || 0) - (popularityContext.fallbackCategoryScores[left.id] || 0);
-      if (fallbackCategoryDelta !== 0) return fallbackCategoryDelta;
-      return left.display_order - right.display_order;
-    });
-    return sortedCategories.map((category) => ({
-      category,
-      items: [...allItems.filter((item) => item.category_id === category.id && item.is_available !== false)].sort((left, right) => {
-        const itemScoreDelta = (popularityContext.itemScores[right.id] || 0) - (popularityContext.itemScores[left.id] || 0);
-        if (itemScoreDelta !== 0) return itemScoreDelta;
-        const fallbackItemDelta = (popularityContext.fallbackItemScores[right.id] || 0) - (popularityContext.fallbackItemScores[left.id] || 0);
-        if (fallbackItemDelta !== 0) return fallbackItemDelta;
-        const ratingDelta = right.rating - left.rating;
-        if (ratingDelta !== 0) return ratingDelta;
-        return left.display_order - right.display_order;
-      }),
-    })).filter((group) => group.items.length > 0);
-  }, [allItems, categories, popularityContext.categoryScores, popularityContext.fallbackCategoryScores, popularityContext.fallbackItemScores, popularityContext.itemScores]);
+  const dealItems = useMemo(
+    () => allItems.filter((item) => item.is_available !== false && getMenuItemDiscount(item.price, item.original_price)),
+    [allItems],
+  );
 
   const categorySlugById = useMemo(
     () => Object.fromEntries(categories.map((c) => [c.id, c.slug])),
@@ -235,6 +214,8 @@ export default function Home() {
         </form>
       </div>
 
+      <FestiveBanner />
+
       {/* ── Offer Carousel ── */}
       {offers.length > 0 && (
         <section className="px-4 pt-4 pb-1">
@@ -257,34 +238,31 @@ export default function Home() {
 
       {/* ── Best Sellers Rail ── */}
       {bestSellers.length > 0 && (
-        <ScrollReveal>
-          <ProductRail
-            icon={<Flame size={15} className="text-orange-400" strokeWidth={2.5} />}
-            badge="HOT"
-            badgeColor="bg-orange-500"
-            title={popularityContext.title.toUpperCase()}
-            subtitle="Most-ordered picks right now"
-            items={bestSellers}
-            onImageClick={handleImageClick}
-            onAdd={handleAdd}
-            linkTo="/menu"
-          />
-        </ScrollReveal>
+        <ProductRail
+          icon={<Flame size={15} className="text-orange-400" strokeWidth={2.5} />}
+          badge="HOT"
+          badgeColor="bg-orange-500"
+          title={popularityContext.title.toUpperCase()}
+          subtitle="Most-ordered picks right now"
+          items={bestSellers}
+          onImageClick={handleImageClick}
+          onAdd={handleAdd}
+          linkTo="/menu"
+        />
       )}
 
-
-      {/* ── Category Rails ── */}
-      {itemsByCategory.map((group, idx) => (
-        <ScrollReveal key={group.category.id} delay={idx * 0.04}>
-          <ProductRail
-            title={group.category.name.toUpperCase()}
-            items={group.items}
-            onImageClick={handleImageClick}
-            onAdd={handleAdd}
-            linkTo={`/menu?category=${group.category.slug}`}
-          />
-        </ScrollReveal>
-      ))}
+      {dealItems.length > 0 && (
+        <ProductRail
+          badge="DEAL"
+          badgeColor="bg-emerald-600"
+          title="PRICE DROPS"
+          subtitle="Marked down today"
+          items={dealItems}
+          onImageClick={handleImageClick}
+          onAdd={handleAdd}
+          linkTo="/offers"
+        />
+      )}
 
       {/* ── Browse All CTA ── */}
       <ScrollReveal>
@@ -369,22 +347,14 @@ function ProductRail({
   onAdd: (item: MenuItem) => void;
   linkTo: string;
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
-  const isInView = useInView(sectionRef, { once: true, margin: '-40px' });
-
-  const railVariants: Variants = {
-    hidden: {},
-    visible: { transition: { staggerChildren: 0.05 } },
-  };
-  const railItemVariants: Variants = {
-    hidden: { opacity: 0, x: 20 },
-    visible: { opacity: 1, x: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } },
-  };
+  useScrollFx(sectionRef, () => {
+    if (sectionRef.current) revealRail(sectionRef.current);
+  }, []);
 
   return (
     <section ref={sectionRef} className="pt-6 pb-1">
-      <div className="flex items-center justify-between px-4 mb-3">
+      <div className="rail-head flex items-center justify-between px-4 mb-3">
         <div className="flex items-center gap-2 min-w-0">
           {icon}
           <div className="min-w-0">
@@ -394,7 +364,7 @@ function ProductRail({
                   {badge}
                 </span>
               )}
-              <h2 className="text-[15px] font-black text-white tracking-tight">{title}</h2>
+              <h2 className={`text-[15px] font-black tracking-tight ${badge ? 'text-shimmer' : 'text-white'}`}>{title}</h2>
             </div>
             {subtitle && <p className="text-[11px] text-brand-text-dim">{subtitle}</p>}
           </div>
@@ -407,24 +377,17 @@ function ProductRail({
         </Link>
       </div>
 
-      <motion.div
-        ref={scrollRef}
-        variants={railVariants}
-        initial="hidden"
-        animate={isInView ? 'visible' : 'hidden'}
-        className="flex gap-2.5 overflow-x-auto scrollbar-hide px-4 snap-x snap-mandatory"
-      >
+      <div className="rail-row flex gap-2.5 overflow-x-auto scrollbar-hide px-4 py-3 -my-2 snap-x snap-mandatory">
         {items.map((item) => (
-          <motion.div
+          <div
             key={item.id}
-            variants={railItemVariants}
-            className="flex-shrink-0 snap-start"
+            className="rail-card flex-shrink-0 snap-start"
             style={{ width: 'clamp(108px, 32vw, 156px)' }}
           >
             <ProductCard item={item} onImageClick={onImageClick} onAdd={onAdd} />
-          </motion.div>
+          </div>
         ))}
-      </motion.div>
+      </div>
 
       <div className="px-4 mt-3">
         <Link
@@ -443,30 +406,10 @@ function ProductRail({
 function HomeLoadingShell() {
   return (
     <div className="bg-brand-bg min-h-screen pb-24">
-      {/* Hero skeleton */}
-      <div className="min-h-[420px] px-4 py-12 flex flex-col lg:flex-row items-center gap-8">
-        <div className="flex-1 flex flex-col gap-4">
-          <div className="h-5 w-40 rounded-full bg-brand-surface animate-pulse" />
-          <div className="space-y-2">
-            <div className="h-14 w-4/5 rounded-xl bg-brand-surface animate-pulse" />
-            <div className="h-14 w-3/5 rounded-xl bg-brand-surface animate-pulse" />
-          </div>
-          <div className="h-4 w-full max-w-xs rounded-full bg-brand-surface animate-pulse" />
-          <div className="flex gap-3">
-            <div className="h-11 w-32 rounded-xl bg-brand-surface animate-pulse" />
-            <div className="h-11 w-28 rounded-xl bg-brand-surface animate-pulse" />
-          </div>
-        </div>
-        <div className="w-64 h-64 rounded-3xl bg-brand-surface animate-pulse" />
-      </div>
       {/* Search skeleton */}
       <div className="px-4 py-2.5 border-b border-brand-border/50">
-        <div className="h-10 rounded-2xl bg-brand-surface animate-pulse" />
+        <div className="mx-auto h-10 max-w-2xl rounded-2xl bg-brand-surface animate-pulse" />
       </div>
-      {/* Offers skeleton */}
-      <section className="px-4 pt-4 pb-1">
-        <div className="h-[200px] animate-pulse rounded-[20px] bg-brand-surface" />
-      </section>
       {/* Category skeleton */}
       <section className="pt-6 pb-1 px-4">
         <div className="h-4 w-36 rounded-full bg-brand-surface mb-3 animate-pulse" />

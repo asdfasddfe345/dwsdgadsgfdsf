@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="54" viewBox="0 0 96 54">
+  <defs>
+    <radialGradient id="shine" cx=".34" cy=".28" r=".8">
+      <stop offset="0" stop-color="#fff" stop-opacity=".5"/>
+      <stop offset=".45" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#3A1200" stop-opacity=".4"/>
+    </radialGradient>
+    <g id="o">
+      <circle r="5" fill="#DD4F08" stroke="#DD4F08" stroke-width="2.6" stroke-dasharray=".01 2.608" stroke-linecap="round"/>
+      <circle r="3.4" fill="#F57C00" stroke="#F57C00" stroke-width="2.1" stroke-dasharray=".01 2.126" stroke-linecap="round" transform="rotate(18)"/>
+      <circle r="1.9" fill="#FF9F1C" stroke="#FF9F1C" stroke-width="1.5" stroke-dasharray=".01 1.482" stroke-linecap="round"/>
+      <circle r=".9" fill="#FFC857"/>
+      <circle r="6.3" fill="url(#shine)"/>
+    </g>
+    <g id="y">
+      <circle r="5" fill="#E09A00" stroke="#E09A00" stroke-width="2.6" stroke-dasharray=".01 2.608" stroke-linecap="round"/>
+      <circle r="3.4" fill="#F7B500" stroke="#F7B500" stroke-width="2.1" stroke-dasharray=".01 2.126" stroke-linecap="round" transform="rotate(18)"/>
+      <circle r="1.9" fill="#FFD23F" stroke="#FFD23F" stroke-width="1.5" stroke-dasharray=".01 1.482" stroke-linecap="round"/>
+      <circle r=".9" fill="#FFF0A8"/>
+      <circle r="6.3" fill="url(#shine)"/>
+    </g>
+    <!-- The drop that hangs where two swags meet. It sits in its own file so it can swing further than the garland. -->
+    <g id="t">
+      <path d="M0 6V45" stroke="#7A5510" stroke-width=".6"/>
+      <use href="#y" transform="translate(0 18) scale(.82)"/>
+      <use href="#o" transform="translate(0 27.5) scale(.74)"/>
+      <use href="#y" transform="translate(0 36) scale(.64)"/>
+      <use href="#o" transform="translate(0 43.4) scale(.54)"/>
+    </g>
+  </defs>
+  <use href="#t"/>
+  <use href="#t" x="96"/>
+</svg>

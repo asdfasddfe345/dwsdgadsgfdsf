@@ -69,7 +69,7 @@ export default function Header() {
                 src="https://res.cloudinary.com/dlkovvlud/image/upload/f_auto,q_auto/v1771590689/Screenshot_2026-02-20_175222-removebg-preview_ufalk6.png"
                 alt="The Supreme Waffle - Premium Gourmet Waffles"
                 loading="eager"
-                fetchPriority="high"
+                {...{ fetchpriority: 'high' }}
                 width={240}
                 height={96}
                 className="h-9 w-auto max-w-[130px] object-contain drop-shadow-[0_0_14px_rgba(216,178,78,0.22)] sm:h-11 sm:max-w-none lg:h-14"
