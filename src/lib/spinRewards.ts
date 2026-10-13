@@ -41,8 +41,10 @@ export function describeSpinReward(reward: RewardRule) {
 
   if (reward.kind === 'bogo') return `Order 2 or more items and the lowest-priced one is free${cap}.`;
   if (reward.kind === 'free_item') return `Your lowest-priced item is free${cap}.`;
-  if (Number(reward.percent) >= 100 && !cap) {
-    return 'Your whole order is free. Delivery and takeaway charges still apply.';
+  if (Number(reward.percent) >= 100) {
+    return cap
+      ? `Up to ₹${Number(reward.max_discount)} off your order. Delivery and takeaway charges still apply.`
+      : 'Your whole order is free. Delivery and takeaway charges still apply.';
   }
   return `${Number(reward.percent)}% off your order${cap}.`;
 }
