@@ -1,6 +1,6 @@
 // Run: node --experimental-strip-types supabase/functions/_shared/spin-rewards.check.ts
 import assert from 'node:assert/strict';
-import { calculateSpinRewardDiscount, pickSpinPrize } from './spin-rewards.ts';
+import { availableSpinPrizes, calculateSpinRewardDiscount, pickSpinPrize } from './spin-rewards.ts';
 import { calculateSpinRewardDiscount as browserDiscount } from '../../../src/lib/spinRewards.ts';
 
 const cart = [
@@ -42,5 +42,35 @@ const wins = { a: 0, never: 0, b: 0 };
 for (let spin = 0; spin < 40000; spin += 1) wins[pickSpinPrize(prizes).id] += 1;
 assert.equal(wins.never, 0);
 assert.ok(Math.abs(wins.a / 40000 - 0.25) < 0.02, `expected about 25% for a, got ${wins.a / 400}%`);
+
+// Win limits: a limited prize leaves the draw once it has been won that many
+// times, and an unlimited prize never does.
+const limitedPrizes = [
+  { id: 'fifty', weight: 3, win_limit: 1 },
+  { id: 'hundred', weight: 1, win_limit: 2 },
+  { id: 'ten', weight: 280, win_limit: null },
+];
+
+assert.deepEqual(availableSpinPrizes(limitedPrizes, {}).map((prize) => prize.id), ['fifty', 'hundred', 'ten']);
+assert.deepEqual(
+  availableSpinPrizes(limitedPrizes, { fifty: 1 }).map((prize) => prize.id),
+  ['hundred', 'ten'],
+  'a prize at its limit stops being drawable',
+);
+assert.deepEqual(
+  availableSpinPrizes(limitedPrizes, { fifty: 1, hundred: 1 }).map((prize) => prize.id),
+  ['hundred', 'ten'],
+  'a limit of 2 survives its first win',
+);
+assert.deepEqual(
+  availableSpinPrizes(limitedPrizes, { fifty: 9, hundred: 9, ten: 9999 }).map((prize) => prize.id),
+  ['ten'],
+  'an unlimited prize is never exhausted',
+);
+
+// The live setting: the two big prizes together can only ever be won twice.
+const bigPrizes = [{ id: 'fifty', weight: 3, win_limit: 1 }, { id: 'hundred', weight: 1, win_limit: 1 }];
+assert.equal(bigPrizes.reduce((total, prize) => total + (prize.win_limit ?? 0), 0), 2);
+assert.deepEqual(availableSpinPrizes(bigPrizes, { fifty: 1, hundred: 1 }), [], 'after two winners both are gone');
 
 console.log('ok');

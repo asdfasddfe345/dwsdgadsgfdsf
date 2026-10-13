@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
-import { pickSpinPrize } from "../_shared/spin-rewards.ts";
+import { availableSpinPrizes, pickSpinPrize } from "../_shared/spin-rewards.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,6 +17,7 @@ interface SpinPrizeRow {
   kind: string;
   percent: number;
   max_discount: number | null;
+  win_limit: number | null;
   weight: number;
 }
 
@@ -93,7 +94,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: prizes, error: prizesError } = await adminClient
       .from("spin_prizes")
-      .select("id, label, kind, percent, max_discount, weight")
+      .select("id, label, kind, percent, max_discount, win_limit, weight")
       .eq("is_active", true)
       .gt("weight", 0)
       .order("display_order");
@@ -106,7 +107,33 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ success: false, error: "The wheel is not available right now" }, 409);
     }
 
-    const prize = pickSpinPrize(prizes as SpinPrizeRow[]);
+    // A prize with a win limit leaves the draw once it has been won that many
+    // times. Only the limited prizes are counted, so this is one indexed count
+    // each, not a scan of every reward.
+    // ponytail: two spins landing on the same limited prize in the same instant
+    // could both pass this and hand out one extra discount. Locking the prize
+    // row is not worth it for a prize this rare.
+    const winsByPrizeId: Record<string, number> = {};
+    for (const prize of (prizes as SpinPrizeRow[]).filter((row) => row.win_limit != null)) {
+      const { count, error: winCountError } = await adminClient
+        .from("spin_rewards")
+        .select("id", { count: "exact", head: true })
+        .eq("prize_id", prize.id);
+
+      if (winCountError) {
+        throw winCountError;
+      }
+
+      winsByPrizeId[prize.id] = count ?? 0;
+    }
+
+    const drawablePrizes = availableSpinPrizes(prizes as SpinPrizeRow[], winsByPrizeId);
+
+    if (!drawablePrizes.length) {
+      return jsonResponse({ success: false, error: "The wheel is not available right now" }, 409);
+    }
+
+    const prize = pickSpinPrize(drawablePrizes);
 
     const { data: reward, error: rewardError } = await adminClient
       .from("spin_rewards")

@@ -40,6 +40,19 @@ export function pickSpinPrize<T extends { weight: number }>(prizes: T[], roll = 
   return prizes[prizes.length - 1];
 }
 
+/**
+ * Prizes that can still be won. A prize with a `win_limit` drops out of the
+ * draw once that many rewards have been handed out, for good.
+ */
+export function availableSpinPrizes<T extends { id: string; win_limit?: number | null }>(
+  prizes: T[],
+  winsByPrizeId: Record<string, number>,
+) {
+  return prizes.filter((prize) => (
+    prize.win_limit == null || (winsByPrizeId[prize.id] ?? 0) < prize.win_limit
+  ));
+}
+
 // Keep in sync with calculateSpinRewardDiscount in src/lib/spinRewards.ts. spin-rewards.check.ts compares the two.
 export function calculateSpinRewardDiscount(
   reward: Pick<SpinRewardRecord, "kind" | "percent" | "max_discount">,
