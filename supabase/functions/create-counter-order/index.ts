@@ -9,6 +9,7 @@ import {
   reserveSpinReward,
   verifySpinRewardForOrder,
 } from "../_shared/spin-rewards.ts";
+import { priceCheckout } from "../_shared/order-pricing.ts";
 import {
   expireStalePendingOrders,
   releaseOrderInventory,
@@ -66,6 +67,8 @@ interface CreateBody {
   reviewRewardDiscountAmount?: number;
   spinRewardId?: string;
   spinRewardDiscountAmount?: number;
+  couponOfferId?: string;
+  automaticOfferId?: string;
   items?: CounterOrderItem[];
 }
 
@@ -144,42 +147,6 @@ function isValidEmail(value: string) {
 function normalizeCustomerPhone(value: string) {
   const trimmed = value.trim();
   return trimmed === LEGACY_CHECKOUT_PHONE_PLACEHOLDER ? "" : trimmed;
-}
-
-async function getUnavailableMenuItemNames(
-  adminClient: ReturnType<typeof createClient>,
-  items: CounterOrderItem[],
-) {
-  const menuItemIds = Array.from(
-    new Set(items.map((item) => item.menu_item_id).filter((menuItemId) => typeof menuItemId === "string" && menuItemId.trim())),
-  );
-
-  if (menuItemIds.length === 0) {
-    return [];
-  }
-
-  const { data, error } = await adminClient
-    .from("menu_items")
-    .select("id, name, is_available")
-    .in("id", menuItemIds);
-
-  if (error) {
-    throw error;
-  }
-
-  const menuItemsById = new Map(
-    (data || []).map((item) => [item.id as string, item as { id: string; name: string; is_available: boolean }]),
-  );
-
-  return menuItemIds.flatMap((menuItemId) => {
-    const matchingItem = menuItemsById.get(menuItemId);
-    if (matchingItem && matchingItem.is_available !== false) {
-      return [];
-    }
-
-    const fallbackName = items.find((item) => item.menu_item_id === menuItemId)?.item_name || "Item";
-    return [matchingItem?.name || fallbackName];
-  });
 }
 
 async function createAppOrder(
@@ -340,6 +307,8 @@ Deno.serve(async (req: Request) => {
     const reviewRewardDiscountAmount = Number(body.reviewRewardDiscountAmount ?? 0);
     const spinRewardId = body.spinRewardId?.trim() || "";
     const spinRewardDiscountAmount = Number(body.spinRewardDiscountAmount ?? 0);
+    const couponOfferId = body.couponOfferId?.trim() || "";
+    const automaticOfferId = body.automaticOfferId?.trim() || "";
 
     if (!customerName || !customerEmail || !isValidEmail(customerEmail)) {
       return jsonResponse({ success: false, error: "Customer name and email are required" }, 400);
@@ -414,6 +383,23 @@ Deno.serve(async (req: Request) => {
       }, 409);
     }
 
+    await expireStalePendingOrders(adminClient);
+
+    // Item prices, add-on prices, the offer discount and any free line all come
+    // from the database. What the browser sent is only ever compared to this.
+    const pricing = await priceCheckout(adminClient, {
+      items,
+      orderType,
+      pickupOption,
+      couponOfferId,
+      automaticOfferId,
+      userId: user?.id ?? null,
+    });
+
+    if ("error" in pricing) {
+      return jsonResponse({ success: false, error: pricing.error }, pricing.status);
+    }
+
     const fulfillment = await resolveCheckoutFulfillment(adminClient, {
       orderType,
       pickupOption,
@@ -422,29 +408,8 @@ Deno.serve(async (req: Request) => {
       deliveryFee,
       deliveryLat,
       deliveryLng,
-      subtotal,
+      subtotal: pricing.subtotal,
     });
-
-    const expectedTotal = roundCurrency(
-      Math.max(0, subtotal - discount) + fulfillment.deliveryFee + fulfillment.takeawayFee,
-    );
-
-    if (Math.abs(roundCurrency(total) - expectedTotal) > 0.01) {
-      return jsonResponse({ success: false, error: "Order total mismatch" }, 400);
-    }
-
-    await expireStalePendingOrders(adminClient);
-
-    const unavailableMenuItemNames = await getUnavailableMenuItemNames(adminClient, items);
-
-    if (unavailableMenuItemNames.length > 0) {
-      return jsonResponse({
-        success: false,
-        error: unavailableMenuItemNames.length === 1
-          ? `${unavailableMenuItemNames[0]} is out of stock right now`
-          : `Some items are out of stock right now: ${unavailableMenuItemNames.join(", ")}`,
-      }, 409);
-    }
 
     let expectedReviewRewardDiscount = 0;
     if (reviewRewardCouponId) {
@@ -463,7 +428,7 @@ Deno.serve(async (req: Request) => {
       }
 
       expectedReviewRewardDiscount = calculateReviewRewardDiscount(
-        subtotal,
+        pricing.subtotal,
         Number(reviewRewardCoupon.discount_percentage ?? 10),
       );
 
@@ -476,15 +441,37 @@ Deno.serve(async (req: Request) => {
       rewardId: spinRewardId,
       claimedDiscount: spinRewardDiscountAmount,
       userId: user?.id ?? null,
-      subtotal,
-      items,
+      subtotal: pricing.subtotal,
+      items: pricing.items,
     });
 
     if ("error" in spinRewardCheck) {
       return jsonResponse({ success: false, error: spinRewardCheck.error }, spinRewardCheck.status);
     }
 
-    const paymentStatus = total <= 0 ? "paid" : "pending";
+    // Every rupee off has to come from something the server just verified.
+    const expectedDiscount = roundCurrency(Math.min(
+      pricing.subtotal,
+      pricing.offerDiscount + expectedReviewRewardDiscount + spinRewardCheck.discount,
+    ));
+    const expectedTotal = roundCurrency(
+      Math.max(0, pricing.subtotal - expectedDiscount) + fulfillment.deliveryFee + fulfillment.takeawayFee,
+    );
+
+    if (Math.abs(roundCurrency(subtotal) - pricing.subtotal) > 0.01) {
+      return jsonResponse({ success: false, error: "Order subtotal mismatch" }, 400);
+    }
+
+    if (Math.abs(roundCurrency(discount) - expectedDiscount) > 0.01) {
+      return jsonResponse({ success: false, error: "Order discount mismatch" }, 400);
+    }
+
+    if (Math.abs(roundCurrency(total) - expectedTotal) > 0.01) {
+      return jsonResponse({ success: false, error: "Order total mismatch" }, 400);
+    }
+
+    // Reads the verified total, so a faked discount cannot mark an order paid.
+    const paymentStatus = expectedTotal <= 0 ? "paid" : "pending";
 
     const orderInsert: AppOrderInsert = {
       user_id: user?.id ?? null,
@@ -508,9 +495,9 @@ Deno.serve(async (req: Request) => {
       address_confidence: fulfillment.orderType === "delivery" ? addressConfidence : null,
       saved_address_id: fulfillment.orderType === "delivery" ? savedAddressId : null,
       takeaway_fee: fulfillment.takeawayFee,
-      subtotal,
-      discount,
-      total,
+      subtotal: pricing.subtotal,
+      discount: expectedDiscount,
+      total: expectedTotal,
       payment_method: paymentMethod,
       payment_status: paymentStatus,
       review_reward_coupon_id: reviewRewardCouponId || null,
@@ -527,13 +514,13 @@ Deno.serve(async (req: Request) => {
     }
 
     const { error: itemsError } = await adminClient.from("order_items").insert(
-      items.map((item) => ({
+      pricing.items.map((item) => ({
         order_id: order.id,
         menu_item_id: item.menu_item_id,
         item_name: item.item_name,
         quantity: item.quantity,
         unit_price: item.unit_price,
-        customizations: item.customizations ?? [],
+        customizations: item.customizations,
       })),
     );
 

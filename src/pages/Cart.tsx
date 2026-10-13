@@ -570,6 +570,7 @@ export default function CartPage() {
       quantity: item.quantity,
       unit_price: 0,
       customizations: [] as SelectedCustomization[],
+      is_reward: true,
     })),
   ];
   const featuredAutomaticOffer = selectedAutomaticOffer?.offer || applicableAutomaticOffers[0]?.offer || activeOffers.find((offer) => getOfferMode(offer) === 'automatic' && isOfferApplicableToOrderType(offer, pricingContext)) || null;
@@ -778,6 +779,8 @@ export default function CartPage() {
       reviewRewardDiscountAmount: reviewRewardDiscount,
       spinRewardId: spinRewardIdForOrder,
       spinRewardDiscountAmount: spinRewardDiscount,
+      couponOfferId: appliedOffer?.id,
+      automaticOfferId: selectedAutomaticOffer?.offer.id,
       items: checkoutItems,
     });
     const razorpayCallbackUrl = buildRazorpayCallbackUrl(razorpayOrder.appOrderId);
@@ -1231,6 +1234,8 @@ export default function CartPage() {
         reviewRewardDiscountAmount: reviewRewardDiscount,
         spinRewardId: spinRewardIdForOrder,
         spinRewardDiscountAmount: spinRewardDiscount,
+        couponOfferId: appliedOffer?.id,
+        automaticOfferId: selectedAutomaticOffer?.offer.id,
         items: checkoutItems,
       });
 

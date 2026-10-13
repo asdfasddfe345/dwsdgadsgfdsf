@@ -12,6 +12,8 @@ export interface RazorpayCartItemInput {
   quantity: number;
   unit_price: number;
   customizations: SelectedCustomization[];
+  /** True on a line an offer gives away. The server re-checks it against the offer. */
+  is_reward?: boolean;
 }
 
 interface CreateRazorpayOrderPayload {
@@ -32,6 +34,8 @@ interface CreateRazorpayOrderPayload {
   reviewRewardDiscountAmount?: number;
   spinRewardId?: string;
   spinRewardDiscountAmount?: number;
+  couponOfferId?: string;
+  automaticOfferId?: string;
   items: RazorpayCartItemInput[];
 }
 
