@@ -268,6 +268,7 @@ export interface SpinReward {
   label: string;
   kind: SpinPrizeKind;
   percent: number;
+  max_discount: number | null;
   spin_day: string;
   expires_at: string;
   redeemed_order_id: string | null;

@@ -7,6 +7,8 @@ export interface SpinRewardRecord {
   user_id: string;
   kind: SpinPrizeKind;
   percent: number;
+  /** Most this prize can take off an order, in rupees. null means no cap. */
+  max_discount: number | null;
   expires_at: string;
   redeemed_order_id: string | null;
 }
@@ -18,7 +20,8 @@ interface PricedItem {
 
 type SpinRewardCheck = { discount: number } | { error: string; status: number };
 
-const SPIN_REWARD_SELECT = "id, user_id, kind, percent, expires_at, redeemed_order_id";
+const SPIN_REWARD_SELECT =
+  "id, user_id, kind, percent, max_discount, expires_at, redeemed_order_id";
 
 function cryptoRoll() {
   return crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
@@ -39,12 +42,14 @@ export function pickSpinPrize<T extends { weight: number }>(prizes: T[], roll = 
 
 // Keep in sync with calculateSpinRewardDiscount in src/lib/spinRewards.ts. spin-rewards.check.ts compares the two.
 export function calculateSpinRewardDiscount(
-  reward: Pick<SpinRewardRecord, "kind" | "percent">,
+  reward: Pick<SpinRewardRecord, "kind" | "percent" | "max_discount">,
   subtotal: number,
   items: PricedItem[],
 ) {
+  const cap = reward.max_discount == null ? Infinity : Number(reward.max_discount);
+
   if (reward.kind === "percent") {
-    return Math.round((subtotal * Number(reward.percent)) / 100);
+    return Math.min(cap, Math.round((subtotal * Number(reward.percent)) / 100));
   }
 
   const paidItems = items.filter((item) => Number(item.unit_price) > 0 && Number(item.quantity) > 0);
@@ -54,7 +59,7 @@ export function calculateSpinRewardDiscount(
     return 0;
   }
 
-  return Math.round(Math.min(...paidItems.map((item) => Number(item.unit_price))));
+  return Math.min(cap, Math.round(Math.min(...paidItems.map((item) => Number(item.unit_price)))));
 }
 
 /** Confirms the customer owns an unused, unexpired prize and that the claimed discount is exactly what that prize gives. */

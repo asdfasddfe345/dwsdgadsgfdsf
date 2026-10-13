@@ -16,6 +16,7 @@ interface SpinPrizeRow {
   label: string;
   kind: string;
   percent: number;
+  max_discount: number | null;
   weight: number;
 }
 
@@ -92,7 +93,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: prizes, error: prizesError } = await adminClient
       .from("spin_prizes")
-      .select("id, label, kind, percent, weight")
+      .select("id, label, kind, percent, max_discount, weight")
       .eq("is_active", true)
       .gt("weight", 0)
       .order("display_order");
@@ -115,6 +116,7 @@ Deno.serve(async (req: Request) => {
         label: prize.label,
         kind: prize.kind,
         percent: prize.percent,
+        max_discount: prize.max_discount,
         spin_day: spinDay,
         expires_at: new Date(Date.now() + REWARD_VALID_HOURS * 60 * 60 * 1000).toISOString(),
       })

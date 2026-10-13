@@ -5,7 +5,7 @@ interface PricedItem {
   unit_price: number;
 }
 
-type RewardRule = { kind: SpinPrizeKind; percent: number };
+type RewardRule = { kind: SpinPrizeKind; percent: number; max_discount?: number | null };
 
 /** The shop's calendar day (India), which is what the one-spin-per-day limit follows. */
 export function todayInIndia(now = new Date()) {
@@ -19,8 +19,10 @@ export function isSpinRewardUsable(reward: Pick<SpinReward, 'expires_at' | 'rede
 // Keep in sync with calculateSpinRewardDiscount in supabase/functions/_shared/spin-rewards.ts.
 // The server recomputes this at checkout and rejects the order if the two disagree.
 export function calculateSpinRewardDiscount(reward: RewardRule, subtotal: number, items: PricedItem[]) {
+  const cap = reward.max_discount == null ? Infinity : Number(reward.max_discount);
+
   if (reward.kind === 'percent') {
-    return Math.round((subtotal * Number(reward.percent)) / 100);
+    return Math.min(cap, Math.round((subtotal * Number(reward.percent)) / 100));
   }
 
   const paidItems = items.filter((item) => Number(item.unit_price) > 0 && Number(item.quantity) > 0);
@@ -30,12 +32,17 @@ export function calculateSpinRewardDiscount(reward: RewardRule, subtotal: number
     return 0;
   }
 
-  return Math.round(Math.min(...paidItems.map((item) => Number(item.unit_price))));
+  return Math.min(cap, Math.round(Math.min(...paidItems.map((item) => Number(item.unit_price)))));
 }
 
 export function describeSpinReward(reward: RewardRule) {
-  if (reward.kind === 'bogo') return 'Order 2 or more items and the lowest-priced one is free.';
-  if (reward.kind === 'free_item') return 'Your lowest-priced item is free.';
-  if (Number(reward.percent) >= 100) return 'Your whole order is free. Delivery and takeaway charges still apply.';
-  return `${Number(reward.percent)}% off your order.`;
+  // A capped prize has to say so here, or the wheel promises more than checkout gives.
+  const cap = reward.max_discount == null ? '' : `, up to ₹${Number(reward.max_discount)} off`;
+
+  if (reward.kind === 'bogo') return `Order 2 or more items and the lowest-priced one is free${cap}.`;
+  if (reward.kind === 'free_item') return `Your lowest-priced item is free${cap}.`;
+  if (Number(reward.percent) >= 100 && !cap) {
+    return 'Your whole order is free. Delivery and takeaway charges still apply.';
+  }
+  return `${Number(reward.percent)}% off your order${cap}.`;
 }

@@ -11,12 +11,18 @@ const cart = [
 const oneItem = [{ quantity: 1, unit_price: 99 }];
 
 const cases = [
-  { reward: { kind: 'percent', percent: 10 }, subtotal: 217, items: cart, expected: 22 },
-  { reward: { kind: 'percent', percent: 100 }, subtotal: 217, items: cart, expected: 217 },
-  { reward: { kind: 'bogo', percent: 0 }, subtotal: 217, items: cart, expected: 59 },
-  { reward: { kind: 'bogo', percent: 0 }, subtotal: 99, items: oneItem, expected: 0 }, // buy 1 get 1 needs 2 items
-  { reward: { kind: 'free_item', percent: 0 }, subtotal: 99, items: oneItem, expected: 99 },
-  { reward: { kind: 'free_item', percent: 0 }, subtotal: 0, items: [], expected: 0 },
+  { reward: { kind: 'percent', percent: 10, max_discount: null }, subtotal: 217, items: cart, expected: 22 },
+  { reward: { kind: 'percent', percent: 100, max_discount: null }, subtotal: 217, items: cart, expected: 217 },
+  { reward: { kind: 'bogo', percent: 0, max_discount: null }, subtotal: 217, items: cart, expected: 59 },
+  { reward: { kind: 'bogo', percent: 0, max_discount: null }, subtotal: 99, items: oneItem, expected: 0 }, // buy 1 get 1 needs 2 items
+  { reward: { kind: 'free_item', percent: 0, max_discount: null }, subtotal: 99, items: oneItem, expected: 99 },
+  { reward: { kind: 'free_item', percent: 0, max_discount: null }, subtotal: 0, items: [], expected: 0 },
+  // 100% OFF is capped at 100 rupees: a big order stops at the cap, a small one just goes free.
+  { reward: { kind: 'percent', percent: 100, max_discount: 100 }, subtotal: 217, items: cart, expected: 100 },
+  { reward: { kind: 'percent', percent: 100, max_discount: 100 }, subtotal: 80, items: cart, expected: 80 },
+  // A cap above the discount changes nothing, and it holds for item prizes too.
+  { reward: { kind: 'percent', percent: 10, max_discount: 100 }, subtotal: 217, items: cart, expected: 22 },
+  { reward: { kind: 'free_item', percent: 0, max_discount: 50 }, subtotal: 99, items: oneItem, expected: 50 },
 ];
 
 for (const { reward, subtotal, items, expected } of cases) {
